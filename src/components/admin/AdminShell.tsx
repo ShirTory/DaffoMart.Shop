@@ -1,0 +1,76 @@
+"use client";
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { Icon, ToastProvider } from "./ui";
+
+const NAV = [
+  { href: "/admin", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin/orders", label: "Orders", icon: "orders" },
+  { href: "/admin/products", label: "Products", icon: "products" },
+  { href: "/admin/categories", label: "Categories", icon: "categories" },
+  { href: "/admin/inventory", label: "Inventory", icon: "inventory" },
+  { href: "/admin/delivery", label: "Delivery Areas", icon: "delivery" },
+  { href: "/admin/riders", label: "Riders", icon: "rider" },
+  { href: "/admin/employees", label: "Employees & Attendance", icon: "rider" },
+  { href: "/admin/couriers", label: "Courier Partners", icon: "delivery" },
+  { href: "/admin/live", label: "Live Map", icon: "delivery" },
+  { href: "/admin/payments", label: "Payments", icon: "cash" },
+  { href: "/admin/covers", label: "Cover Images", icon: "covers" },
+  { href: "/admin/offers", label: "Offers & Coupons", icon: "offers" },
+  { href: "/admin/content", label: "Website Content", icon: "content" },
+  { href: "/admin/settings", label: "Settings & Contact", icon: "settings" },
+];
+
+export default function AdminShell({ email, children }: { email: string; children: React.ReactNode }) {
+  const path = usePathname(); const router = useRouter(); const [open, setOpen] = useState(false); const [pending, setPending] = useState(0);
+  useEffect(() => setOpen(false), [path]);
+  useEffect(() => { api<{ count: number }>("/api/admin/riders-pending").then((r) => setPending(r.count)).catch(() => {}); }, [path]); // new rider applications waiting for approval
+  const active = (h: string) => (h === "/admin" ? path === h : path.startsWith(h));
+  const logout = async () => { await api("/api/auth/logout", { method: "POST" }).catch(() => {}); router.replace("/admin/login"); router.refresh(); };
+  const current = NAV.find((n) => active(n.href))?.label ?? "Admin";
+
+  const Sidebar = (
+    <div className="flex h-full flex-col bg-primary-deeper text-white">
+      <div className="px-5 pb-4 pt-5">
+        <div className="rounded-xl bg-white px-3 py-2.5"><Image src="/logo-horizontal.png" alt="DaffoMart" width={778} height={168} className="h-9 w-auto" priority /></div>
+        <p className="mt-3 px-1 text-[11px] font-semibold uppercase tracking-widest text-white/40">Admin Panel</p>
+      </div>
+      <nav className="scroll-thin flex-1 space-y-1 overflow-y-auto px-3">
+        {NAV.map((n) => (
+          <Link key={n.href} href={n.href} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${active(n.href) ? "bg-accent text-white shadow" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
+            <Icon name={n.icon} className="h-[18px] w-[18px]" />{n.label}
+            {n.href === "/admin/riders" && pending > 0 && <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white" title="Rider applications waiting for approval">{pending}</span>}
+          </Link>))}
+      </nav>
+      <div className="space-y-1 border-t border-white/10 p-3">
+        <Link href="/" target="_blank" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/70 hover:bg-white/10 hover:text-white"><Icon name="external" className="h-[18px] w-[18px]" />View storefront</Link>
+        <button onClick={logout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/70 hover:bg-white/10 hover:text-white"><Icon name="out" className="h-[18px] w-[18px]" />Sign out</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <ToastProvider>
+      <div className="min-h-screen bg-gray-100">
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">{Sidebar}</aside>
+        {open && <div className="fixed inset-0 z-40 lg:hidden"><div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} /><aside className="fade-in absolute inset-y-0 left-0 w-64">{Sidebar}</aside></div>}
+        <div className="lg:pl-64">
+          <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-white/90 px-4 backdrop-blur sm:px-6">
+            <div className="flex items-center gap-3">
+              <button className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Icon name="menu" /></button>
+              <span className="text-sm font-semibold text-gray-700">{current}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden text-sm text-gray-500 sm:block">{email}</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">{email.charAt(0).toUpperCase()}</span>
+            </div>
+          </header>
+          <main className="mx-auto max-w-[1400px] p-4 sm:p-6">{children}</main>
+        </div>
+      </div>
+    </ToastProvider>
+  );
+}
