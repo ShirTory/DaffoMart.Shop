@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useWishlist, type WishlistItem } from "@/lib/wishlist";
+import { useFlags } from "./TextsProvider";
 
 export default function WishlistButton({ item, className = "" }: { item: WishlistItem; className?: string }) {
   const { add, remove, has } = useWishlist();
-  const [on, setOn] = useState(false);
+  const [on, setOn] = useState(false); const flags = useFlags();
   useEffect(() => { setOn(has(item.id)); }, [item.id, has]);
+  if (!flags.showWishlist) return null;
   return (
     <button
       type="button"

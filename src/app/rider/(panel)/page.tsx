@@ -11,6 +11,7 @@ import { PAYMENT_LABEL, type Order } from "@/lib/types";
 
 interface Me { id: string; name: string; phone: string; vehicle: string; area: string }
 interface Data { active: Order[]; recent: Order[] }
+interface Att { status: string; checkIn?: string; checkOut?: string }
 const NEXT: Record<string, { to: string; label: string } | undefined> = {
   assigned: { to: "picked_up", label: "✅ Picked up order" }, picked_up: { to: "on_the_way", label: "🛵 Start delivery" }, on_the_way: { to: "delivered", label: "📦 Mark delivered" },
 };
@@ -21,6 +22,9 @@ const collect = (o: Order) => (o.payment === "cod" && o.paymentStatus !== "paid"
 function Dashboard() {
   const toast = useToast(); const router = useRouter();
   const [me, setMe] = useState<Me | null>(null); const [data, setData] = useState<Data | null>(null); const [tab, setTab] = useState<"active" | "map" | "done">("active");
+  const [att, setAtt] = useState<Att | null>(null); const [attBusy, setAttBusy] = useState(false);
+  useEffect(() => { api<{ today: Att | null }>("/api/rider/attendance").then((r) => setAtt(r.today)).catch(() => {}); }, []);
+  const punch = async (action: "in" | "out") => { setAttBusy(true); setErr(""); try { setAtt(await api<Att>("/api/rider/attendance", { method: "POST", body: { action } })); } catch (e: any) { setErr(e.message); } finally { setAttBusy(false); } };
   const [share, setShare] = useState(false); const gps = useRiderGps(share);
   useEffect(() => { try { setShare(localStorage.getItem("dm-rider-gps") === "1"); } catch { /* private mode */ } }, []);
   const setSharing = (v: boolean) => { setShare(v); try { localStorage.setItem("dm-rider-gps", v ? "1" : "0"); } catch { /* ignore */ } };
@@ -55,6 +59,11 @@ function Dashboard() {
       <div className={`mx-3 mt-3 flex items-center justify-between gap-3 rounded-xl p-3 text-sm shadow-card ${share && gps.state === "live" ? "bg-emerald-50" : gps.state === "denied" || gps.state === "error" || gps.state === "unsupported" ? "bg-red-50" : "bg-white"}`}>
         <div className="min-w-0"><p className="font-bold">{share && gps.state === "live" ? "🟢 " : "📡 "}Share live location</p><p className="text-xs text-gray-600">{GPS_TEXT[gps.state]}</p>{share && <p className="mt-0.5 text-[11px] text-gray-400">Keep this page open with the screen on — phones pause GPS in the background.</p>}</div>
         <button onClick={() => setSharing(!share)} role="switch" aria-checked={share} className={`relative h-7 w-12 shrink-0 rounded-full transition ${share ? "bg-emerald-500" : "bg-gray-300"}`}><span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${share ? "left-[22px]" : "left-0.5"}`} /></button>
+      </div>
+
+      <div className="mx-3 mt-3 flex items-center justify-between gap-3 rounded-xl bg-white p-3 text-sm shadow-card">
+        <div className="min-w-0"><p className="font-bold">🕘 Today&apos;s attendance</p><p className="text-xs text-gray-600">{!att?.checkIn ? "Not checked in yet" : att.checkOut ? `In ${att.checkIn} · Out ${att.checkOut}` : `Checked in at ${att.checkIn}${att.status === "late" ? " (late)" : ""}`}</p></div>
+        {!att?.checkIn ? <button className="btn-primary btn-sm shrink-0" disabled={attBusy} onClick={() => punch("in")}>Check in</button> : !att.checkOut ? <button className="btn-outline btn-sm shrink-0" disabled={attBusy} onClick={() => punch("out")}>Check out</button> : <span className="shrink-0 text-xl">✅</span>}
       </div>
 
       <div className="grid grid-cols-3 gap-2 p-3 text-center">
@@ -93,7 +102,7 @@ function Dashboard() {
                   <p className="text-xs text-gray-500">{hasPin(o) ? "Exact location shared by the customer." : "Location is searched from the address — confirm by phone if unsure."} <a className="font-semibold text-primary" href={mapsView(o)} target="_blank" rel="noopener noreferrer">Open in Google Maps</a></p>
                   {o.note && <p className="rounded-lg bg-amber-50 p-2.5 text-amber-900"><b>Note:</b> {o.note}</p>}
                   <ul className="divide-y rounded-xl bg-white">{o.items.map((i) => <li key={i.id} className="flex justify-between p-2.5"><span>{i.name} <span className="text-gray-500">× {i.qty}</span></span><span className="font-semibold">{taka(i.price * i.qty)}</span></li>)}</ul>
-                  <p className="text-xs text-gray-500">{PAYMENT_LABEL[o.payment] ?? o.payment} · {o.paymentStatus === "paid" ? "Paid" : o.payment === "cod" ? "Cash due on delivery" : "Payment not confirmed"} · Ordered {fmtDateTime(o.createdAt)}</p>
+                  <p className="text-xs text-gray-500">{o.paymentLabel ?? PAYMENT_LABEL[o.payment] ?? o.payment} · {o.paymentStatus === "paid" ? "Paid" : o.payment === "cod" ? "Cash due on delivery" : "Payment not confirmed"} · Ordered {fmtDateTime(o.createdAt)}</p>
                 </div>)}
               {(nx || ["assigned", "picked_up", "on_the_way"].includes(o.status)) && (
                 <div className="flex gap-2 border-t p-3">

@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useCart } from "@/lib/store";
 import { useCartSync, useCoupon } from "@/lib/hooks";
 import { taka } from "@/lib/format";
+import { useT } from "@/components/store/TextsProvider";
 
 export default function CartPage() {
-  const { items, setQty, remove } = useCart();
+  const { items, setQty, remove } = useCart(); const t = useT();
   const [mounted, setMounted] = useState(false); const [input, setInput] = useState("");
   useEffect(() => setMounted(true), []);
   useCartSync();
@@ -19,7 +20,7 @@ export default function CartPage() {
   );
   return (
     <div>
-      <h1 className="mb-5 text-2xl font-bold tracking-tight">Shopping cart <span className="text-base font-normal text-gray-500">({items.length} item{items.length > 1 ? "s" : ""})</span></h1>
+      <h1 className="mb-5 text-2xl font-bold tracking-tight">{t("cart.title")} <span className="text-base font-normal text-gray-500">({items.length} item{items.length > 1 ? "s" : ""})</span></h1>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-3">
           {items.map((i) => (
@@ -41,8 +42,8 @@ export default function CartPage() {
           <div className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-gray-600">Subtotal</span><span>{taka(subtotal)}</span></div>
             {c.discount > 0 && <div className="flex justify-between text-emerald-700"><span>Discount</span><span>−{taka(c.discount)}</span></div>}
             <p className="text-xs text-gray-500">Delivery charge is calculated at checkout.</p></div>
-          <Link href="/checkout" className="btn-accent w-full py-3">Proceed to checkout</Link>
-          <Link href="/products" className="block text-center text-sm text-gray-500 hover:text-primary">← Continue shopping</Link>
+          <Link href="/checkout" className="btn-accent w-full py-3">{t("cart.checkout")}</Link>
+          <Link href="/products" className="block text-center text-sm text-gray-500 hover:text-primary">← {t("checkout.continue")}</Link>
         </aside>
       </div>
     </div>

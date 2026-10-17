@@ -3,7 +3,7 @@ import { ApiError } from "./http";
 import { defaultSettings } from "./seed";
 import { ORDER_STATUSES } from "@/lib/types";
 import { paymentOptions } from "./payments";
-import type { DeliveryZone, Offer, Order, OrderItem, Product, Rider, StockLog, StoreSettings } from "@/lib/types";
+import type { Courier, DeliveryZone, Offer, Order, OrderItem, Product, Rider, StockLog, StoreSettings } from "@/lib/types";
 import { orderCreateSchema } from "@/lib/validators";
 import { riderApproved } from "@/lib/rider";
 import type { z } from "zod";
@@ -12,6 +12,8 @@ export async function getSettings(): Promise<StoreSettings> {
   const s = await db.get<StoreSettings>("settings", "store");
   const m = { ...defaultSettings, ...(s ?? {}) };
   if (!Array.isArray(m.features) || m.features.length === 0) m.features = defaultSettings.features;
+  // Old installs stored rose/amber/slate colours that never matched the logo and were never applied; treat them as "not set".
+  for (const k of ["primaryColor", "accentColor", "secondaryColor"] as const) if (["#e11d48", "#f59e0b", "#0f172a"].includes(String(m[k] ?? "").toLowerCase())) m[k] = k === "primaryColor" ? "#1E3A8A" : k === "accentColor" ? "#F7941D" : "";
   return m;
 }
 
@@ -62,21 +64,19 @@ export async function createOrder(input: z.infer<typeof orderCreateSchema>): Pro
   if (settings.minOrder > 0 && subtotal < settings.minOrder) throw new ApiError(400, `Minimum order amount is ৳${settings.minOrder}`);
   const delivery = zone.freeOver > 0 && subtotal - discount >= zone.freeOver ? 0 : zone.charge;
   const serviceCharge = Math.max(0, Number(settings.serviceCharge) || 0);
-  const opts = await paymentOptions(settings);
-  const opt = opts.find((p) => p.id === input.payment);
+  const opt = (await paymentOptions(settings)).find((p) => p.id === input.payment);
   if (!opt || opt.disabled) throw new ApiError(400, opt?.disabled ? "Online payment is not available yet. Please choose another payment method." : "This payment method is not available. Please choose another one.");
-  // Manual mobile-money style methods (built-in bKash/Nagad or any custom with a number / requireTrx)
-  const isManual = input.payment === "bkash" || input.payment === "nagad" || (input.payment !== "cod" && input.payment !== "online" && Boolean(opt.number));
+  // Manual mobile-money style methods: built-in bKash/Nagad, or any custom method that requires a TrxID
+  const isManual = input.payment === "bkash" || input.payment === "nagad" || (input.payment !== "cod" && input.payment !== "online" && opt.requireTrx !== false);
   if (isManual) {
     if (!input.paymentRef || input.paymentRef.length < 6) throw new ApiError(400, "Enter the Transaction ID (TrxID) of your payment");
     if (!input.paymentFrom || !/^01[3-9]\d{8}$/.test(input.paymentFrom)) throw new ApiError(400, "Enter the mobile number you paid from (01XXXXXXXXX)");
   }
   const hasRx = items.some((i) => map.get(i.id)?.prescriptionRequired);
   const now = new Date().toISOString();
-  const ono = orderNo();
   const order: Order = {
-    id: newId(), orderNo: ono, invoiceNo: "INV-" + ono.replace(/^DM-/, ""), name: input.name, phone: input.phone, address: input.address, zone: zone.id, zoneName: zone.name, ...(hasRx ? { hasRx: true } : {}),
-    payment: input.payment, paymentStatus: isManual ? "pending" : "unpaid",
+    id: newId(), orderNo: orderNo(), name: input.name, phone: input.phone, address: input.address, zone: zone.id, zoneName: zone.name, ...(hasRx ? { hasRx: true } : {}),
+    payment: input.payment, ...(["cod","bkash","nagad","online"].includes(input.payment) ? {} : { paymentLabel: opt.label }), paymentStatus: isManual ? "pending" : "unpaid",
     ...(isManual ? { paymentRef: input.paymentRef, paymentFrom: input.paymentFrom } : {}),
     ...(input.lat !== undefined && input.lng !== undefined ? { lat: input.lat, lng: input.lng } : {}), note: input.note ?? "", items, subtotal, delivery, serviceCharge, discount, ...(couponCode ? { couponCode } : {}),
     total: subtotal - discount + delivery + serviceCharge, status: "pending", createdAt: now, updatedAt: now,
@@ -194,4 +194,24 @@ export async function dashboardStats(days = 14) {
     lowStock: products.filter((p) => p.active && p.stock <= 10).sort((a, b) => a.stock - b.stock).slice(0, 6).map((p) => ({ id: p.id, name: p.name, stock: p.stock, image: p.image, emoji: p.emoji, unit: p.unit })),
     recentOrders: [...orders].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6),
   };
+}
+
+/** Hand an order to a courier company (outside Dhaka). courierId "" removes the courier. Entering a tracking number marks it on the way. */
+export async function setCourier(id: string, courierId?: string, trackingNo?: string) {
+  const o = await db.get<Order>("orders", id);
+  if (!o) throw new ApiError(404, "Order not found");
+  const patch: Partial<Order> = { updatedAt: new Date().toISOString() };
+  let cid = o.courierId;
+  if (courierId !== undefined) {
+    if (!courierId) { cid = undefined; Object.assign(patch, { courierId: undefined, courierName: undefined, trackingNo: undefined, courierUrl: undefined, courierAt: undefined }); }
+    else { const c = await db.get<Courier>("couriers", courierId); if (!c) throw new ApiError(404, "Courier not found"); cid = c.id; Object.assign(patch, { courierId: c.id, courierName: c.name, courierAt: o.courierAt ?? patch.updatedAt }); }
+  }
+  if (cid) {
+    const c = await db.get<Courier>("couriers", cid);
+    const tn = trackingNo !== undefined ? trackingNo.trim() : o.trackingNo ?? "";
+    patch.trackingNo = tn || undefined;
+    patch.courierUrl = c?.trackingUrl && tn ? (c.trackingUrl.includes("{tracking}") ? c.trackingUrl.replace("{tracking}", encodeURIComponent(tn)) : c.trackingUrl) : undefined;
+    if (tn && !o.trackingNo && ["pending", "confirmed", "processing", "assigned"].includes(o.status)) patch.status = "on_the_way";
+  } else if (trackingNo) throw new ApiError(400, "Choose a courier first");
+  return (await db.update<Order>("orders", id, patch))!;
 }

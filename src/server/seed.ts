@@ -4,14 +4,14 @@ import type { Category, DeliveryZone, Product, StoreSettings } from "@/lib/types
 export const defaultSettings: StoreSettings = {
   storeName: "DaffoMart", tagline: "Everyday Essentials, Delivered with Care.",
   phone: "", whatsapp: "", email: "", address: "Dhaka, Bangladesh", facebook: "",
-  announcement: "Everyday essentials delivered with care · Cash on delivery available",
+  announcement: "Everyday essentials, delivered with care · Cash on delivery available",
   deliveryInside: 60, deliveryOutside: 120, freeDeliveryOver: 0,
   serviceCharge: 0,
   hours: "Every day, 8:00 AM – 10:00 PM", mapUrl: "", minOrder: 0, logo: "",
   footerText: "",
   heroTitle: "Groceries & medicine,\ndelivered to your door.", heroSubtitle: "Fresh food, daily needs and trusted medicine — order online, pay on delivery.", heroCta: "Shop now",
   features: [
-    { icon: "🚚", title: "Fast delivery", text: "Quick delivery to your door" },
+    { icon: "🚚", title: "Fast delivery", text: "Quick & reliable" },
     { icon: "🌿", title: "Always fresh", text: "Quality checked" },
     { icon: "💵", title: "Cash on delivery", text: "Pay when you receive" },
     { icon: "🏷️", title: "Best prices", text: "Daily offers" },
@@ -24,17 +24,17 @@ export const defaultSettings: StoreSettings = {
   emptyStateIcon: "🔍",
   returnPolicy: "Unopened items can be returned within 24 hours of delivery with proof of purchase. Perishable goods may not be eligible. Contact support for assistance.",
   exchangePolicy: "Damaged or wrong items can be exchanged within 24 hours. Please keep the original packaging and invoice.",
-  primaryColor: "#E11D48",
-  accentColor: "#F59E0B",
-  secondaryColor: "#0F172A",
-  buttonRadius: "full",
+  primaryColor: "#1E3A8A",
+  accentColor: "#F7941D",
+  secondaryColor: "",
+  buttonRadius: "lg",
   buttonSize: "md",
   supportCallLabel: "Call Now",
   supportWaLabel: "WhatsApp",
   showSupportCall: true,
   showSupportWa: true,
-  invoiceFooter: "Thank you for shopping with DaffoMart.",
   metaPixelId: "",
+  invoiceFooter: "Thank you for shopping with DaffoMart.",
   courierOutsideNote: "Outside Dhaka: delivery via courier partners. Timing may vary by location.",
   medicineNotice: "Prescription (Rx) medicines are delivered only after our pharmacist confirms your prescription by phone.",
 };
@@ -44,7 +44,7 @@ const now = () => new Date().toISOString();
 async function seedZones(s: StoreSettings) {
   const z: DeliveryZone[] = [
     { id: "inside", name: "Inside Dhaka", charge: s.deliveryInside ?? 60, freeOver: s.freeDeliveryOver ?? 0, eta: "Same day", active: true, sortOrder: 1 },
-    { id: "outside", name: "Outside Dhaka", charge: s.deliveryOutside ?? 120, freeOver: 0, eta: "1–3 days", active: true, sortOrder: 2 },
+    { id: "outside", name: "Outside Dhaka", charge: s.deliveryOutside ?? 120, freeOver: 0, eta: "1–3 days", active: true, sortOrder: 2, viaCourier: true },
   ];
   for (const x of z) await rawDb.put("zones", x.id, x);
 }

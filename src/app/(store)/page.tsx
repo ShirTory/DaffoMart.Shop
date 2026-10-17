@@ -5,9 +5,13 @@ import HeroSlider from "@/components/store/HeroSlider";
 import CopyCode from "@/components/store/CopyCode";
 import { getActiveProducts, getBanners, getCategories, getOffers, getSettings } from "@/server/queries";
 import { taka } from "@/lib/format";
+import { makeT } from "@/lib/texts";
+import { validHex } from "@/lib/theme";
+import { pageMeta } from "@/lib/seo";
+import type { Metadata } from "next";
 export const revalidate = 60;
 
-const Section = ({ title, children, href, emoji }: { title: string; children: React.ReactNode; href?: string; emoji?: string }) => (
+const Section = ({ title, children, href, emoji, viewAll = "View all →" }: { title: string; children: React.ReactNode; href?: string; emoji?: string; viewAll?: string }) => (
   <section className="mt-8 sm:mt-10">
     <div className="mb-4 flex items-end justify-between gap-3">
       <h2 className="text-lg font-extrabold tracking-tight text-gray-900 sm:text-xl md:text-2xl">
@@ -16,7 +20,7 @@ const Section = ({ title, children, href, emoji }: { title: string; children: Re
       </h2>
       {href && (
         <Link href={href} className="shrink-0 text-sm font-semibold text-primary hover:underline">
-          View all →
+          {viewAll}
         </Link>
       )}
     </div>
@@ -35,14 +39,26 @@ const CardWrap = ({ children }: { children: React.ReactNode }) => (
   <div className="w-[42vw] max-w-[180px] shrink-0 sm:w-auto sm:max-w-none">{children}</div>
 );
 
+const ICON = { sm: "h-16 w-16 sm:h-20 sm:w-20", md: "h-20 w-20 sm:h-24 sm:w-24", lg: "h-24 w-24 sm:h-28 sm:w-28" } as Record<string, string>;
+const ICON_W = { sm: "w-[76px] sm:w-[88px]", md: "w-[88px] sm:w-[100px]", lg: "w-[104px] sm:w-[120px]" } as Record<string, string>;
+const SHAPE = { rounded: "rounded-2xl", circle: "rounded-full", square: "rounded-md" } as Record<string, string>;
+const GAP = { sm: "gap-2", md: "gap-3", lg: "gap-5" } as Record<string, string>;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const s = await getSettings();
+  const title = s.seoTitle || `${s.storeName} – ${s.tagline}`;
+  return { ...pageMeta({ title, description: s.seoDescription || undefined, path: "/", image: s.ogImage || undefined }), title: { absolute: title } };
+}
+
 export default async function Home() {
   const [products, categories, banners, offers, settings] = await Promise.all([
     getActiveProducts(), getCategories(), getBanners(), getOffers(), getSettings(),
   ]);
+  const t = makeT(settings.texts); const va = t("home.viewAll");
   const medCats = categories.filter((c) => c.kind === "medicine");
   const medIds = new Set(medCats.map((c) => c.id));
   const meds = products.filter((p) => medIds.has(p.categoryId));
-  const shopCats = categories.filter((c) => c.kind !== "medicine" && c.active !== false);
+  const shopCats = categories.filter((c) => c.kind !== "medicine" && c.active !== false && !c.hideOnHome);
   const groc = products.filter((p) => !medIds.has(p.categoryId));
   const featured = groc.filter((p) => p.featured).slice(0, 12);
   const fresh = [...groc].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12);
@@ -56,12 +72,12 @@ export default async function Home() {
       {banners.length > 0 ? (
         <HeroSlider banners={banners} />
       ) : (
-        <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-700 via-red-600 to-orange-500 p-8 text-white sm:p-12">
+        <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-deeper via-primary to-primary-dark p-8 text-white sm:p-12">
           <div className="relative z-10 max-w-xl">
             <p className="text-sm font-semibold text-white/80">{settings.storeName}</p>
             <h1 className="mt-2 whitespace-pre-line text-3xl font-extrabold leading-tight sm:text-4xl">{settings.heroTitle}</h1>
             <p className="mt-2 text-white/85">{settings.heroSubtitle || settings.tagline}</p>
-            <Link href="/products" className="mt-5 inline-flex rounded-full bg-white px-6 py-2.5 text-sm font-bold text-red-700 shadow hover:bg-gray-50">
+            <Link href="/products" className="mt-5 inline-flex rounded-full bg-accent px-6 py-2.5 text-sm font-bold text-white shadow hover:bg-accent-dark">
               {settings.heroCta || "Shop now"}
             </Link>
           </div>
@@ -77,7 +93,7 @@ export default async function Home() {
           { icon: "💵", title: "Easy payment", text: "COD · bKash · Nagad" },
         ]).slice(0, 4).map((f, k) => (
           <div key={k} className="flex items-center gap-2.5 rounded-xl border bg-white px-3 py-3 shadow-sm">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-lg">{f.icon}</span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg">{f.icon}</span>
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-gray-900">{f.title}</p>
               <p className="truncate text-[11px] text-gray-500">{f.text}</p>
@@ -86,41 +102,40 @@ export default async function Home() {
         ))}
       </div>
 
-      {/* Horizontal shop-by-category */}
-      {shopCats.length > 0 && (
-        <Section title="Shop by category">
-          <div className="scroll-thin -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-            {shopCats.map((c) => (
-              <Link
-                key={c.id}
-                href={`/products?cat=${c.id}`}
-                className="group flex w-[88px] shrink-0 flex-col items-center sm:w-[100px]"
-              >
-                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-gray-50 to-white shadow-sm ring-1 ring-gray-100 transition group-hover:ring-primary sm:h-24 sm:w-24">
-                  {c.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.image} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  ) : (
-                    <span className="text-3xl">{c.emoji || "🛒"}</span>
-                  )}
-                </div>
-                <p className="mt-2 line-clamp-2 text-center text-xs font-semibold text-gray-800 group-hover:text-primary">{c.name}</p>
-              </Link>
-            ))}
+      {/* Shop-by-category icons: size, shape, background, labels, spacing and visibility come from Admin → Appearance; each image from Admin → Categories */}
+      {settings.showCatSection !== false && shopCats.length > 0 && (
+        <Section title={t("home.categories")}>
+          <div className={`scroll-thin -mx-4 flex overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 ${GAP[settings.catGap || "md"] ?? GAP.md}`}>
+            {shopCats.map((c) => {
+              const bg = validHex(c.iconBg) || validHex(settings.catIconBg);
+              return (
+                <Link key={c.id} href={`/products?cat=${c.id}`} className={`group flex shrink-0 flex-col items-center ${ICON_W[settings.catIconSize || "md"] ?? ICON_W.md}`}>
+                  <div className={`flex items-center justify-center overflow-hidden shadow-sm ring-1 ring-gray-100 transition group-hover:ring-primary ${ICON[settings.catIconSize || "md"] ?? ICON.md} ${SHAPE[settings.catIconShape || "rounded"] ?? SHAPE.rounded} ${bg ? "" : "bg-gradient-to-b from-gray-50 to-white"}`} style={bg ? { background: bg } : undefined}>
+                    {c.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={c.image} alt={c.name} className={`h-full w-full ${settings.catIconFit === "contain" ? "object-contain p-2" : "object-cover"}`} loading="lazy" decoding="async" />
+                    ) : (
+                      <span className="text-3xl">{c.emoji || "🛒"}</span>
+                    )}
+                  </div>
+                  {settings.catShowLabels !== false && <p className="mt-2 line-clamp-2 text-center text-xs font-semibold group-hover:text-primary" style={{ color: validHex(settings.catLabelColor) || "#1f2937" }}>{c.name}</p>}
+                </Link>
+              );
+            })}
           </div>
         </Section>
       )}
 
       {/* Image offer posters from admin offers (only those with images) */}
       {posterOffers.length > 0 && (
-        <Section title="Special deals" emoji="🔥">
+        <Section title={t("home.deals")} emoji="🔥">
           <div className="scroll-thin -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3">
             {posterOffers.map((o) => (
               <div key={o.id} className="relative w-[85vw] max-w-md shrink-0 overflow-hidden rounded-2xl border bg-white shadow-sm sm:w-auto sm:max-w-none">
                 <div className="relative aspect-[16/7] bg-gray-100">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={o.image!} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  {o.badge && <span className="absolute left-3 top-3 rounded bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">{o.badge}</span>}
+                  {o.badge && <span className="absolute left-3 top-3 rounded bg-accent px-2 py-0.5 text-[11px] font-bold text-white">{o.badge}</span>}
                 </div>
                 <div className="p-3">
                   <h3 className="font-bold text-gray-900">{o.title}</h3>
@@ -142,8 +157,8 @@ export default async function Home() {
       {offers.filter((o) => !o.image).length > 0 && (
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {offers.filter((o) => !o.image).slice(0, 6).map((o) => (
-            <div key={o.id} className="flex items-center gap-3 rounded-xl border bg-gradient-to-r from-red-50 to-white p-3 shadow-sm">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-600 text-sm font-extrabold text-white">
+            <div key={o.id} className="flex items-center gap-3 rounded-xl border bg-gradient-to-r from-accent-soft to-white p-3 shadow-sm">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-sm font-extrabold text-white">
                 {o.discountType === "percent" ? `${o.discountValue}%` : taka(o.discountValue)}
               </div>
               <div className="min-w-0 flex-1">
@@ -156,7 +171,7 @@ export default async function Home() {
       )}
 
       {settings.showMedicine && meds.length > 0 && (
-        <Section title={settings.medicineTitle || "Medicine"} href="/medicine" emoji="💊">
+        <Section title={settings.medicineTitle || "Medicine"} href="/medicine" emoji="💊" viewAll={va}>
           <HScroll>
             {meds.slice(0, 10).map((p) => (
               <CardWrap key={p.id}><ProductCard p={p} whatsapp={settings.whatsapp} /></CardWrap>
@@ -166,7 +181,7 @@ export default async function Home() {
       )}
 
       {sale.length > 0 && (
-        <Section title="Hot deals" href="/products?sale=1" emoji="🔥">
+        <Section title={t("home.hot")} href="/products?sale=1" viewAll={va} emoji="🔥">
           <HScroll>
             {sale.map((p) => (
               <CardWrap key={p.id}><ProductCard p={p} whatsapp={settings.whatsapp} /></CardWrap>
@@ -176,7 +191,7 @@ export default async function Home() {
       )}
 
       {featured.length > 0 && (
-        <Section title="Recommended for you" href="/products?featured=1" emoji="⭐">
+        <Section title={t("home.featured")} href="/products?featured=1" viewAll={va} emoji="⭐">
           <HScroll>
             {featured.map((p) => (
               <CardWrap key={p.id}><ProductCard p={p} whatsapp={settings.whatsapp} /></CardWrap>
@@ -186,7 +201,7 @@ export default async function Home() {
       )}
 
       {best.some((p) => p.sold > 0) && (
-        <Section title="Hot & trending" href="/products?sort=popular" emoji="📈">
+        <Section title={t("home.trending")} href="/products?sort=popular" viewAll={va} emoji="📈">
           <HScroll>
             {best.map((p) => (
               <CardWrap key={p.id}><ProductCard p={p} whatsapp={settings.whatsapp} /></CardWrap>
@@ -195,7 +210,7 @@ export default async function Home() {
         </Section>
       )}
 
-      <Section title="New arrivals" href="/products" emoji="✨">
+      <Section title={t("home.new")} href="/products" viewAll={va} emoji="✨">
         <HScroll>
           {fresh.map((p) => (
             <CardWrap key={p.id}><ProductCard p={p} whatsapp={settings.whatsapp} /></CardWrap>
@@ -204,7 +219,7 @@ export default async function Home() {
       </Section>
 
       {products.length === 0 && (
-        <p className="mt-10 rounded-2xl border bg-white p-10 text-center text-gray-500">Products are coming soon.</p>
+        <p className="mt-10 rounded-2xl border bg-white p-10 text-center text-gray-500">{t("home.soon")}</p>
       )}
     </>
   );

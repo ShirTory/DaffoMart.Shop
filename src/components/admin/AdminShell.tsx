@@ -6,21 +6,26 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Icon, ToastProvider } from "./ui";
 
-const NAV = [
-  { href: "/admin", label: "Dashboard", icon: "dashboard" },
-  { href: "/admin/orders", label: "Orders", icon: "orders" },
+const NAV: { href: string; label: string; icon: string; section?: string }[] = [
+  { href: "/admin", label: "Dashboard", icon: "dashboard", section: "Overview" },
+  { href: "/admin/operations", label: "Operations", icon: "ops" },
+  { href: "/admin/orders", label: "Orders", icon: "orders", section: "Sales" },
   { href: "/admin/products", label: "Products", icon: "products" },
   { href: "/admin/categories", label: "Categories", icon: "categories" },
   { href: "/admin/inventory", label: "Inventory", icon: "inventory" },
-  { href: "/admin/delivery", label: "Delivery Areas", icon: "delivery" },
-  { href: "/admin/riders", label: "Riders", icon: "rider" },
-  { href: "/admin/employees", label: "Employees & Attendance", icon: "rider" },
-  { href: "/admin/couriers", label: "Courier Partners", icon: "delivery" },
-  { href: "/admin/live", label: "Live Map", icon: "delivery" },
-  { href: "/admin/payments", label: "Payments", icon: "cash" },
-  { href: "/admin/covers", label: "Cover Images", icon: "covers" },
   { href: "/admin/offers", label: "Offers & Coupons", icon: "offers" },
+  { href: "/admin/delivery", label: "Delivery Areas", icon: "delivery", section: "Delivery" },
+  { href: "/admin/riders", label: "Riders", icon: "rider" },
+  { href: "/admin/live", label: "Live Map", icon: "delivery" },
+  { href: "/admin/couriers", label: "Courier Services", icon: "delivery" },
+  { href: "/admin/employees", label: "Staff", icon: "users", section: "Team" },
+  { href: "/admin/attendance", label: "Attendance", icon: "calendar" },
+  { href: "/admin/appearance", label: "Appearance", icon: "palette", section: "Website" },
+  { href: "/admin/texts", label: "Website Text", icon: "text" },
   { href: "/admin/content", label: "Website Content", icon: "content" },
+  { href: "/admin/covers", label: "Cover Images", icon: "covers" },
+  { href: "/admin/payments", label: "Payments", icon: "trend" },
+  { href: "/admin/invoice-settings", label: "Invoice", icon: "invoice" },
   { href: "/admin/settings", label: "Settings & Contact", icon: "settings" },
 ];
 
@@ -28,7 +33,7 @@ export default function AdminShell({ email, children }: { email: string; childre
   const path = usePathname(); const router = useRouter(); const [open, setOpen] = useState(false); const [pending, setPending] = useState(0);
   useEffect(() => setOpen(false), [path]);
   useEffect(() => { api<{ count: number }>("/api/admin/riders-pending").then((r) => setPending(r.count)).catch(() => {}); }, [path]); // new rider applications waiting for approval
-  const active = (h: string) => (h === "/admin" ? path === h : path.startsWith(h));
+  const active = (h: string) => (h === "/admin" ? path === h : path === h || path.startsWith(h + "/"));
   const logout = async () => { await api("/api/auth/logout", { method: "POST" }).catch(() => {}); router.replace("/admin/login"); router.refresh(); };
   const current = NAV.find((n) => active(n.href))?.label ?? "Admin";
 
@@ -40,10 +45,12 @@ export default function AdminShell({ email, children }: { email: string; childre
       </div>
       <nav className="scroll-thin flex-1 space-y-1 overflow-y-auto px-3">
         {NAV.map((n) => (
-          <Link key={n.href} href={n.href} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${active(n.href) ? "bg-accent text-white shadow" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
+          <div key={n.href}>
+            {n.section && <p className="px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest text-white/35">{n.section}</p>}
+          <Link href={n.href} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${active(n.href) ? "bg-accent text-white shadow" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
             <Icon name={n.icon} className="h-[18px] w-[18px]" />{n.label}
             {n.href === "/admin/riders" && pending > 0 && <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white" title="Rider applications waiting for approval">{pending}</span>}
-          </Link>))}
+          </Link></div>))}
       </nav>
       <div className="space-y-1 border-t border-white/10 p-3">
         <Link href="/" target="_blank" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/70 hover:bg-white/10 hover:text-white"><Icon name="external" className="h-[18px] w-[18px]" />View storefront</Link>

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/store/ProductCard";
+import EmptyState from "@/components/store/EmptyState";
 import { getActiveProducts, getCategories, getSettings } from "@/server/queries";
-export const metadata: Metadata = { title: "Medicine & Healthcare" };
+export const metadata: Metadata = { title: "Medicine & Healthcare", alternates: { canonical: "/medicine" } };
 
 type SP = { q?: string; cat?: string; rx?: string; sort?: string };
 export default async function MedicinePage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -32,7 +33,7 @@ export default async function MedicinePage({ searchParams }: { searchParams: Pro
         <Link href={link({ rx: rx === "0" ? "" : "0" })} className={chip(rx === "0")}>No prescription needed</Link><Link href={link({ rx: rx === "1" ? "" : "1" })} className={chip(rx === "1")}>Rx only</Link>
       </div>
       <p className="mt-4 text-sm text-gray-500">{list.length} product{list.length === 1 ? "" : "s"}</p>
-      {list.length === 0 ? <div className="mt-3 rounded-2xl border bg-white p-12 text-center"><p className="text-4xl">💊</p><p className="mt-2 font-semibold">No medicine found</p><p className="text-sm text-gray-500">Try a different name or clear the filters.</p><Link href="/medicine" className="btn-primary mt-4">Clear filters</Link></div> :
+      {list.length === 0 ? <div className="mt-3"><EmptyState kind={ids.size && all.some((p) => ids.has(p.categoryId)) ? "search" : "none"} settings={s} actionHref="/medicine" /></div> :
         <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">{list.map((p) => <ProductCard key={p.id} p={p} whatsapp={s.whatsapp} />)}</div>}
     </div>
   );

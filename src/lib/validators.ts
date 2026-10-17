@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 const url = z.string().max(1000).refine((v) => v === "" || v.startsWith("/") || /^https?:\/\//.test(v), "Must be a valid URL or path");
+const colorRe = /^(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6})?$/;
+const color = z.string().trim().max(9).regex(colorRe, "Use a colour like #1E3A8A").optional();
+const pick = (...v: [string, ...string[]]) => z.enum(v).optional();
 const optionalDate = z.string().optional().transform((v) => (v ? v : undefined));
 
 export const productSchema = z.object({
@@ -32,6 +35,9 @@ export const categorySchema = z.object({
   description: z.string().trim().max(300).optional().transform((v) => v || undefined),
   coverOverlay: z.enum(["dark", "medium", "light", "none"]).optional(),
   coverHeight: z.enum(["sm", "md", "lg"]).optional(),
+  coverTextColor: color, coverBg: color, coverPosition: pick("top", "center", "bottom"),
+  coverTitle: z.string().trim().max(80).optional().transform((v) => v || undefined),
+  hideOnHome: z.boolean().optional(), iconBg: color,
   kind: z.enum(["grocery", "medicine"]).default("grocery"),
   active: z.boolean().default(true),
   sortOrder: z.coerce.number().int().default(0),
@@ -96,9 +102,29 @@ export const settingsSchema = z.object({
   emptyStateIcon: z.string().trim().max(8).optional(),
   returnPolicy: z.string().trim().max(2000).optional(),
   exchangePolicy: z.string().trim().max(2000).optional(),
-  primaryColor: z.string().trim().max(20).optional(),
-  accentColor: z.string().trim().max(20).optional(),
-  secondaryColor: z.string().trim().max(20).optional(),
+  primaryColor: color, accentColor: color, secondaryColor: color,
+  buttonColor: color, buttonTextColor: color, buttonStyle: pick("solid", "outline", "soft"),
+  showBuyNow: z.boolean().optional(), showWishlist: z.boolean().optional(), showCardWhatsapp: z.boolean().optional(), showCardDelivery: z.boolean().optional(),
+  supportCallColor: color, supportWaColor: color, supportPosition: pick("right", "left"), supportWaMessage: z.string().trim().max(200).optional(),
+  showCatSection: z.boolean().optional(), catIconSize: pick("sm", "md", "lg"), catIconShape: pick("rounded", "circle", "square"), catIconBg: color, catIconFit: pick("cover", "contain"),
+  catShowLabels: z.boolean().optional(), catGap: pick("sm", "md", "lg"), catLabelColor: color,
+  emptyStateImage: url.optional(), emptyStateBg: color, emptyStateColor: color, emptyStateAlign: pick("center", "left"),
+  footerPromoShow: z.boolean().optional(), footerPromoHeight: pick("sm", "md", "lg"), footerPromoBg: color, footerPromoAlt: z.string().trim().max(120).optional(), footerPromoFit: pick("cover", "contain"),
+  footerShowPayments: z.boolean().optional(), footerShowCategories: z.boolean().optional(),
+  texts: z.record(z.string().regex(/^[a-zA-Z0-9._-]{1,60}$/), z.string().max(400)).refine((o) => Object.keys(o).length <= 300, "Too many text entries").optional(),
+  payDisplay: z.record(z.enum(["cod", "bkash", "nagad", "online"]), z.object({
+    label: z.string().trim().max(40).optional(), hint: z.string().trim().max(120).optional(), logo: url.optional(), color: color,
+    order: z.coerce.number().int().min(0).max(99).optional(), visible: z.boolean().optional(),
+  })).optional(),
+  seoTitle: z.string().trim().max(70).optional(), seoDescription: z.string().trim().max(200).optional(), ogImage: url.optional(), favicon: url.optional(),
+  invoice: z.object({
+    title: z.string().trim().max(40).optional(), prefix: z.string().trim().max(12).optional(), companyName: z.string().trim().max(80).optional(), logo: url.optional(), showLogo: z.boolean().optional(),
+    address: z.string().trim().max(240).optional(), phone: z.string().trim().max(40).optional(), email: z.string().trim().max(120).optional(), website: z.string().trim().max(120).optional(),
+    taxId: z.string().trim().max(60).optional(), taxLabel: z.string().trim().max(30).optional(), accent: color, paper: pick("A4", "A5", "thermal"), layout: pick("classic", "modern"),
+    showItemImage: z.boolean().optional(), showUnit: z.boolean().optional(), showPaymentInfo: z.boolean().optional(), showCourier: z.boolean().optional(), showCustomerPhone: z.boolean().optional(), showPaidStamp: z.boolean().optional(),
+    notes: z.string().trim().max(400).optional(), terms: z.string().trim().max(800).optional(), footer: z.string().trim().max(300).optional(),
+    signatureLabel: z.string().trim().max(40).optional(), showSignature: z.boolean().optional(),
+  }).optional(),
   buttonRadius: z.enum(["none", "sm", "md", "lg", "full"]).optional(),
   buttonSize: z.enum(["sm", "md", "lg"]).optional(),
   supportCallLabel: z.string().trim().max(40).optional(),
@@ -119,6 +145,7 @@ export const zoneSchema = z.object({
   charge: z.coerce.number().min(0, "Charge must be 0 or more"),
   freeOver: z.coerce.number().min(0).default(0),
   eta: z.string().trim().max(60).default(""),
+  viaCourier: z.boolean().default(false),
   active: z.boolean().default(true),
   sortOrder: z.coerce.number().int().default(0),
 });
@@ -159,7 +186,8 @@ export const orderPatchSchema = z.object({
   status: z.enum(["pending", "confirmed", "processing", "assigned", "picked_up", "on_the_way", "delivered", "cancelled", "returned"]).optional(),
   riderId: z.string().max(60).optional(),
   paymentStatus: z.enum(["unpaid", "pending", "paid", "failed", "refunded"]).optional(),
-}).refine((v) => v.status !== undefined || v.riderId !== undefined || v.paymentStatus !== undefined, { message: "Nothing to update" });
+  courierId: z.string().max(60).optional(), trackingNo: z.string().trim().max(60).optional(),
+}).refine((v) => v.status !== undefined || v.riderId !== undefined || v.paymentStatus !== undefined || v.courierId !== undefined || v.trackingNo !== undefined, { message: "Nothing to update" });
 
 export const loginSchema = z.object({ email: z.string().trim().email("Enter a valid email"), password: z.string().min(1, "Enter your password") });
 
@@ -194,38 +222,34 @@ export const riderLocationSchema = z.union([
   z.object({ stop: z.literal(true) }),
 ]);
 
+/* ---------- operations: employees, attendance, couriers ---------- */
+const bdOrBlank = z.string().trim().max(20).regex(/^(\+?[0-9][0-9\s-]{5,18})?$/, "Enter a valid phone number").default("");
 export const employeeSchema = z.object({
-  name: z.string().trim().min(2, "Name required").max(80),
-  phone: z.string().trim().min(5).max(20),
-  email: z.string().trim().email().optional().or(z.literal("")),
-  role: z.enum(["ceo", "manager", "supervisor", "staff", "rider", "warehouse", "support"]),
-  department: z.string().trim().max(60).optional().or(z.literal("")),
+  name: z.string().trim().min(2, "Name is required").max(80),
+  role: z.string().trim().min(2, "Choose a role").max(40),
+  phone: bdOrBlank,
+  email: z.string().trim().max(120).default(""),
+  department: z.string().trim().max(60).optional().transform((v) => v || undefined),
+  joinedAt: optionalDate,
+  salary: z.coerce.number().min(0).max(10_000_000).optional().transform((v) => (v ? v : undefined)),
+  note: z.string().trim().max(300).default(""),
   active: z.boolean().default(true),
-  joinedAt: z.string().trim().max(30).optional().or(z.literal("")),
-  notes: z.string().trim().max(400).optional().or(z.literal("")),
-  riderId: z.string().trim().max(40).optional().or(z.literal("")),
+  riderId: z.string().max(60).optional().transform((v) => v || undefined),
 });
-
-export const attendanceSchema = z.object({
-  employeeId: z.string().min(1),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
-  checkIn: z.string().trim().max(30).optional().or(z.literal("")),
-  checkOut: z.string().trim().max(30).optional().or(z.literal("")),
-  status: z.enum(["present", "absent", "late", "half", "leave"]).default("present"),
-  note: z.string().trim().max(200).optional().or(z.literal("")),
-});
-
 export const courierSchema = z.object({
-  name: z.string().trim().min(2).max(80),
-  phone: z.string().trim().min(5).max(20),
-  contactPerson: z.string().trim().max(80).optional().or(z.literal("")),
-  areas: z.string().trim().max(200).default("Outside Dhaka"),
-  chargeNote: z.string().trim().max(200).optional().or(z.literal("")),
-  trackingUrl: z.string().trim().max(400).optional().or(z.literal("")),
+  name: z.string().trim().min(2, "Courier name is required").max(60),
+  phone: bdOrBlank,
+  trackingUrl: z.string().trim().max(300).refine((v) => v === "" || /^https?:\/\//.test(v), "Must start with http:// or https://").default(""),
+  note: z.string().trim().max(300).default(""),
+  charge: z.coerce.number().min(0).max(100000).default(0),
   active: z.boolean().default(true),
   sortOrder: z.coerce.number().int().default(0),
-  notes: z.string().trim().max(400).optional().or(z.literal("")),
 });
+const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be HH:MM").optional().or(z.literal("")).transform((v) => v || undefined);
+export const attendanceStatus = z.enum(["present", "late", "half", "leave", "absent", "off"]);
+export const attendanceUpsertSchema = z.object({ employeeId: z.string().min(1), date: dateStr, status: attendanceStatus, checkIn: hhmm, checkOut: hhmm, note: z.string().trim().max(200).optional() });
+export const attendanceBulkSchema = z.object({ date: dateStr, status: attendanceStatus.default("present"), overwrite: z.boolean().default(false), employeeIds: z.array(z.string()).max(500).optional() });
 
 /** Custom payment methods (Rocket, Upay, bank transfer, etc.) managed from Admin → Payments. */
 export const paymentMethodSchema = z.object({

@@ -7,6 +7,7 @@ import type { Category } from "@/lib/types";
 type Form = {
   name: string; emoji: string; image?: string;
   coverImage?: string; description?: string; coverOverlay?: string; coverHeight?: string;
+  coverTextColor?: string; coverBg?: string; coverPosition?: string; coverTitle?: string; hideOnHome?: boolean; iconBg?: string;
   kind: "grocery" | "medicine"; active: boolean; sortOrder: string;
 };
 
@@ -28,6 +29,7 @@ export default function CategoriesPage() {
               name: c.name, emoji: c.emoji, image: c.image,
               coverImage: c.coverImage, description: c.description || "",
               coverOverlay: c.coverOverlay || "medium", coverHeight: c.coverHeight || "md",
+              coverTextColor: c.coverTextColor || "", coverBg: c.coverBg || "", coverPosition: c.coverPosition || "center", coverTitle: c.coverTitle || "", hideOnHome: !!c.hideOnHome, iconBg: c.iconBg || "",
               kind: c.kind ?? "grocery", active: c.active, sortOrder: String(c.sortOrder),
             },
           }
@@ -35,7 +37,7 @@ export default function CategoriesPage() {
             f: {
               name: "", emoji: "🛍️", kind: "grocery", active: true,
               sortOrder: String((data?.length ?? 0) + 1),
-              description: "", coverOverlay: "medium", coverHeight: "md",
+              description: "", coverOverlay: "medium", coverHeight: "md", coverPosition: "center", coverTextColor: "", coverBg: "", coverTitle: "", hideOnHome: false, iconBg: "",
             },
           }
     );
@@ -90,8 +92,8 @@ export default function CategoriesPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {data.map((c) => (
-            <div key={c.id} className="card flex gap-3 p-4">
-              <Thumb src={c.coverImage || c.image} emoji={c.emoji} className="h-16 w-16 text-3xl" />
+            <div key={c.id} className="card flex flex-wrap gap-3 p-4">
+              <Thumb src={c.image} emoji={c.emoji} className="h-16 w-16 text-3xl" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{c.name}</p>
                 <p className="text-xs text-gray-500">Order #{c.sortOrder}</p>
@@ -105,6 +107,12 @@ export default function CategoriesPage() {
                 <button className="btn-ghost btn-sm" onClick={() => open(c)} aria-label="Edit"><Icon name="edit" className="h-4 w-4" /></button>
                 <button className="btn-ghost btn-sm text-red-600" onClick={() => del(c)} aria-label="Delete"><Icon name="trash" className="h-4 w-4" /></button>
               </div>
+              <button type="button" onClick={() => open(c)} className="relative h-20 w-full basis-full overflow-hidden rounded-lg border border-dashed bg-gray-50 text-xs font-semibold text-gray-500 hover:border-primary hover:text-primary" aria-label={`Cover image for ${c.name}`}>
+                {c.coverImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <><img src={c.coverImage} alt="" className="h-full w-full object-cover" /><span className="absolute bottom-1 right-1 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">Change cover</span></>
+                ) : "＋ Add cover image for this category"}
+              </button>
             </div>
           ))}
         </div>
@@ -139,6 +147,7 @@ export default function CategoriesPage() {
               </div>
             </div>
             <ImageUpload kind="category" label="Cover / landing image (optional)" value={edit.f.coverImage} onChange={(v) => set("coverImage", v)} />
+            <Field label="Page title (optional)" hint="Empty = the category name"><input className="input" value={edit.f.coverTitle || ""} maxLength={80} onChange={(e) => set("coverTitle", e.target.value)} /></Field>
             <Field label="Short description (shown on category page)">
               <input className="input" value={edit.f.description || ""} onChange={(e) => set("description", e.target.value)} maxLength={300} />
             </Field>
@@ -159,13 +168,19 @@ export default function CategoriesPage() {
                 </select>
               </Field>
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Image position"><select className="input" value={edit.f.coverPosition || "center"} onChange={(e) => set("coverPosition", e.target.value)}><option value="top">Show the top</option><option value="center">Centre</option><option value="bottom">Show the bottom</option></select></Field>
+              <Field label="Title / text colour"><div className="flex items-center gap-2"><input type="color" className="h-10 w-12 rounded border bg-white p-1" value={edit.f.coverTextColor || "#111827"} onChange={(e) => set("coverTextColor", e.target.value)} />{edit.f.coverTextColor && <button type="button" className="btn-ghost btn-sm" onClick={() => set("coverTextColor", "")}>Reset</button>}</div></Field>
+              <Field label="Banner background colour" hint="Shows when there is no image"><div className="flex items-center gap-2"><input type="color" className="h-10 w-12 rounded border bg-white p-1" value={edit.f.coverBg || "#1E3A8A"} onChange={(e) => set("coverBg", e.target.value)} />{edit.f.coverBg && <button type="button" className="btn-ghost btn-sm" onClick={() => set("coverBg", "")}>Reset</button>}</div></Field>
+              <Field label="Home icon background"><div className="flex items-center gap-2"><input type="color" className="h-10 w-12 rounded border bg-white p-1" value={edit.f.iconBg || "#F3F4F6"} onChange={(e) => set("iconBg", e.target.value)} />{edit.f.iconBg && <button type="button" className="btn-ghost btn-sm" onClick={() => set("iconBg", "")}>Reset</button>}</div></Field>
+            </div>
             <Field label="Section type" hint="Medicine categories appear in the Medicine section.">
               <select className="input" value={edit.f.kind} onChange={(e) => set("kind", e.target.value as Form["kind"])}>
                 <option value="grocery">Grocery / general shop</option>
                 <option value="medicine">💊 Medicine / healthcare</option>
               </select>
             </Field>
-            <Toggle checked={edit.f.active} onChange={(v) => set("active", v)} label="Visible in store" />
+            <div className="flex flex-wrap gap-x-6 gap-y-3"><Toggle checked={edit.f.active} onChange={(v) => set("active", v)} label="Visible in store" /><Toggle checked={!edit.f.hideOnHome} onChange={(v) => set("hideOnHome", !v)} label="Show icon on home page" /></div>
           </div>
         )}
       </Modal>

@@ -29,6 +29,7 @@ export const GET = handle(async (req) => {
     payment: o.payment, paymentStatus: o.paymentStatus, zoneName: o.zoneName,
     ...(zone?.eta ? { eta: zone.eta } : {}),
     canCancel, ...(cancelEndsAt ? { cancelEndsAt } : {}),
+    ...(o.courierName ? { courierName: o.courierName, ...(o.trackingNo ? { trackingNo: o.trackingNo } : {}), ...(o.courierUrl ? { courierUrl: o.courierUrl } : {}) } : {}),
     ...(["assigned", "picked_up", "on_the_way"].includes(o.status) && o.riderName ? { riderName: o.riderName, riderPhone: o.riderPhone } : {}),
   });
 });

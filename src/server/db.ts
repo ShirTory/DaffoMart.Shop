@@ -3,10 +3,7 @@ import { revalidateTag } from "next/cache";
 import fs from "fs";
 import path from "path";
 
-export type Col =
-  | "products" | "categories" | "banners" | "offers" | "orders" | "settings" | "zones" | "riders"
-  | "stocklogs" | "images" | "nid"
-  | "employees" | "attendance" | "couriers" | "payment_methods";
+export type Col = "products" | "categories" | "banners" | "offers" | "orders" | "settings" | "zones" | "riders" | "stocklogs" | "images" | "nid" | "employees" | "attendance" | "couriers" | "payment_methods";
 export const newId = () => randomBytes(8).toString("hex");
 
 interface Driver {

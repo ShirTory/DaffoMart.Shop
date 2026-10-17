@@ -12,13 +12,8 @@ interface Sys {
   test?: { firestore: string; storage: string };
 }
 
-type Extra = {
-  primaryColor: string; accentColor: string; buttonRadius: string; buttonSize: string;
-  supportCallLabel: string; supportWaLabel: string; showSupportCall: boolean; showSupportWa: boolean;
-  emptyStateTitle: string; emptyStateText: string; emptyStateIcon: string;
-  returnPolicy: string; exchangePolicy: string;
-  invoiceFooter: string; courierOutsideNote: string; metaPixelId: string;
-};
+// Colours, buttons, support buttons and empty-state look moved to Admin → Appearance; invoice to Admin → Invoice.
+type Extra = { returnPolicy: string; exchangePolicy: string; courierOutsideNote: string; metaPixelId: string };
 
 export default function SettingsPage() {
   const toast = useToast();
@@ -35,22 +30,10 @@ export default function SettingsPage() {
     if (!data) return;
     setF(Object.fromEntries(KEYS.map((k) => [k, String(data[k] ?? "")])) as Record<K, string>);
     setX({
-      primaryColor: data.primaryColor || "#E11D48",
-      accentColor: data.accentColor || "#F59E0B",
-      buttonRadius: data.buttonRadius || "full",
-      buttonSize: data.buttonSize || "md",
-      supportCallLabel: data.supportCallLabel || "Call Now",
-      supportWaLabel: data.supportWaLabel || "WhatsApp",
-      showSupportCall: data.showSupportCall !== false,
-      showSupportWa: data.showSupportWa !== false,
-      emptyStateTitle: data.emptyStateTitle || "No products found",
-      emptyStateText: data.emptyStateText || "Try a different search or filter.",
-      emptyStateIcon: data.emptyStateIcon || "🔍",
       returnPolicy: data.returnPolicy || "",
       exchangePolicy: data.exchangePolicy || "",
-      invoiceFooter: data.invoiceFooter || "",
-      metaPixelId: data.metaPixelId || "",
       courierOutsideNote: data.courierOutsideNote || "",
+      metaPixelId: data.metaPixelId || "",
     });
   }, [data]);
 
@@ -92,7 +75,7 @@ export default function SettingsPage() {
   return (
     <>
       <form onSubmit={save}>
-        <PageHeader title="Settings & appearance" subtitle="Contact, theme, support buttons, policies, empty state">
+        <PageHeader title="Settings & contact" subtitle="Store info, contact numbers, delivery notes and the return & exchange policy">
           <button className="btn-primary" disabled={busy}>{busy && <Spinner className="h-4 w-4" />}Save all</button>
         </PageHeader>
 
@@ -120,56 +103,19 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          <section className="card space-y-4 p-5">
-            <h2 className="font-bold">Theme (buttons & colours)</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Primary colour"><input className="input h-10" type="color" value={x.primaryColor} onChange={setXStr("primaryColor")} /></Field>
-              <Field label="Accent colour"><input className="input h-10" type="color" value={x.accentColor} onChange={setXStr("accentColor")} /></Field>
-              <Field label="Button shape">
-                <select className="input" value={x.buttonRadius} onChange={setXStr("buttonRadius")}>
-                  <option value="none">Square</option>
-                  <option value="sm">Slightly rounded</option>
-                  <option value="md">Rounded</option>
-                  <option value="lg">More rounded</option>
-                  <option value="full">Pill (full)</option>
-                </select>
-              </Field>
-              <Field label="Button size">
-                <select className="input" value={x.buttonSize} onChange={setXStr("buttonSize")}>
-                  <option value="sm">Small</option>
-                  <option value="md">Medium</option>
-                  <option value="lg">Large</option>
-                </select>
-              </Field>
-            </div>
+          <section className="card space-y-2 p-5">
+            <h2 className="font-bold">Looking for colours, buttons, call / WhatsApp buttons or empty messages?</h2>
+            <p className="text-sm text-gray-500">They now live in <a className="font-semibold text-primary underline" href="/admin/appearance">Appearance</a> (look), <a className="font-semibold text-primary underline" href="/admin/texts">Website Text</a> (wording) and <a className="font-semibold text-primary underline" href="/admin/invoice-settings">Invoice</a>.</p>
           </section>
 
           <section className="card space-y-4 p-5">
-            <h2 className="font-bold">Support buttons (floating)</h2>
-            <div className="flex flex-wrap gap-4">
-              <Toggle checked={x.showSupportCall} onChange={(v) => setX({ ...x, showSupportCall: v })} label="Show Call Now" />
-              <Toggle checked={x.showSupportWa} onChange={(v) => setX({ ...x, showSupportWa: v })} label="Show WhatsApp" />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Call button label"><input className="input" value={x.supportCallLabel} onChange={setXStr("supportCallLabel")} /></Field>
-              <Field label="WhatsApp button label"><input className="input" value={x.supportWaLabel} onChange={setXStr("supportWaLabel")} /></Field>
-            </div>
+            <h2 className="font-bold">Outside Dhaka (courier) note</h2>
+            <Field label="Shown at checkout and in the footer for courier-delivered areas"><textarea className="input min-h-[72px]" value={x.courierOutsideNote} onChange={setXStr("courierOutsideNote")} /></Field>
           </section>
 
           <section className="card space-y-4 p-5">
-            <h2 className="font-bold">Empty product state</h2>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Icon"><input className="input text-center text-xl" value={x.emptyStateIcon} onChange={setXStr("emptyStateIcon")} maxLength={8} /></Field>
-              <Field label="Title" className="sm:col-span-2"><input className="input" value={x.emptyStateTitle} onChange={setXStr("emptyStateTitle")} /></Field>
-            </div>
-            <Field label="Message"><textarea className="input min-h-[72px]" value={x.emptyStateText} onChange={setXStr("emptyStateText")} /></Field>
-          </section>
-
-          <section className="card space-y-4 p-5">
-            <h2 className="font-bold">Invoice & outside Dhaka</h2>
-            <Field label="Invoice footer text"><input className="input" value={x.invoiceFooter} onChange={setXStr("invoiceFooter")} /></Field>
+            <h2 className="font-bold">Tracking</h2>
             <Field label="Meta Pixel ID" hint="Facebook / Meta Pixel — leave empty to disable. Only digits."><input className="input" value={x.metaPixelId} onChange={setXStr("metaPixelId")} placeholder="e.g. 1234567890" /></Field>
-            <Field label="Outside Dhaka / courier note"><textarea className="input min-h-[72px]" value={x.courierOutsideNote} onChange={setXStr("courierOutsideNote")} /></Field>
           </section>
 
           <section className="card space-y-4 p-5 lg:col-span-2">

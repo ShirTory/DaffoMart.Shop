@@ -7,18 +7,21 @@ import { distanceKm, fmtDistance, mapsDirections, roughEtaMin } from "@/lib/maps
 import LiveMap, { type Pin } from "@/components/maps/LiveMap";
 import { useCart } from "@/lib/store";
 import type { OrderItem } from "@/lib/types";
+import { useT } from "./TextsProvider";
 
 interface Tracked {
   orderNo: string; status: string; createdAt: string; updatedAt: string;
   items: OrderItem[]; subtotal: number; delivery: number; serviceCharge?: number; discount: number; total: number;
   zoneName?: string; payment?: string; paymentStatus?: string;
   riderName?: string; riderPhone?: string; eta?: string;
+  courierName?: string; trackingNo?: string; courierUrl?: string;
   canCancel?: boolean; cancelEndsAt?: string;
   dest?: { lat: number; lng: number }; riderLoc?: { lat: number; lng: number; ageSec: number };
 }
 const STEPS = ["pending", "confirmed", "processing", "on_the_way", "delivered"];
 
 export default function TrackForm() {
+  const t = useT();
   const router = useRouter();
   const add = useCart((s) => s.add);
   const [no, setNo] = useState(""); const [phone, setPhone] = useState("");
@@ -83,12 +86,12 @@ export default function TrackForm() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-bold tracking-tight">Track your order</h1>
-      <p className="mt-1 text-sm text-gray-500">Enter the order number and the mobile number you used at checkout.</p>
+      <h1 className="text-2xl font-bold tracking-tight">{t("track.title")}</h1>
+      <p className="mt-1 text-sm text-gray-500">{t("track.hint")}</p>
       <form onSubmit={(e) => { e.preventDefault(); lookup(no.trim(), phone.trim()); }} className="mt-5 grid gap-3 rounded-2xl border bg-white p-5 shadow-card sm:grid-cols-[1fr_1fr_auto]">
         <input className="input uppercase" placeholder="Order no. (DM-XXXXXXX)" value={no} onChange={(e) => setNo(e.target.value)} required aria-label="Order number" />
         <input className="input" placeholder="Mobile number" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} required aria-label="Mobile number" />
-        <button className="btn-primary" disabled={busy}>{busy ? "Searching…" : "Track"}</button>
+        <button className="btn-primary" disabled={busy}>{busy ? "Searching…" : t("track.button")}</button>
       </form>
       {err && <p className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">{err}</p>}
       {cancelMsg && <p className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800" role="status">{cancelMsg}</p>}
@@ -123,8 +126,15 @@ export default function TrackForm() {
             </p>
           )}
           {o.payment === "online" && o.paymentStatus !== "paid" && !dead && (
-            <button type="button" className="btn-accent w-full py-3" onClick={payNow} disabled={payBusy}>{payBusy ? "Opening payment page…" : "💳 Pay now"}</button>
+            <button type="button" className="btn-accent w-full py-3" onClick={payNow} disabled={payBusy}>{payBusy ? "Opening payment page…" : t("track.pay")}</button>
           )}
+          {o.courierName && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-primary-soft p-3.5 text-sm">
+              <span>🚚 Shipped with <b>{o.courierName}</b>{o.trackingNo && <> · Tracking no. <b className="font-mono">{o.trackingNo}</b></>}</span>
+              {o.courierUrl && <a href={o.courierUrl} target="_blank" rel="noopener noreferrer" className="btn-primary btn-sm">Track shipment</a>}
+            </div>
+          )}
+          <a href={`/invoice?no=${encodeURIComponent(o.orderNo)}&phone=${encodeURIComponent(phone.trim())}`} target="_blank" rel="noopener noreferrer" className="btn-outline w-full">{t("track.invoice")}</a>
           {o.riderName && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-primary-soft p-3.5 text-sm">
               <span>🛵 Your delivery rider: <b>{o.riderName}</b></span>
@@ -147,7 +157,7 @@ export default function TrackForm() {
           {stillCanCancel && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-900">
               <span>Cancel within <b>{Math.floor(cancelSecsLeft / 60)}:{String(cancelSecsLeft % 60).padStart(2, "0")}</b></span>
-              <button className="btn bg-red-600 text-white hover:bg-red-700 btn-sm" onClick={cancelOrder} disabled={cancelBusy}>{cancelBusy ? "Cancelling…" : "Cancel order"}</button>
+              <button className="btn bg-red-600 text-white hover:bg-red-700 btn-sm" onClick={cancelOrder} disabled={cancelBusy}>{cancelBusy ? "Cancelling…" : t("track.cancel")}</button>
             </div>
           )}
           <ul className="divide-y rounded-xl border">
@@ -166,7 +176,7 @@ export default function TrackForm() {
             <div className="flex justify-between border-t pt-2 font-bold"><span>Total</span><span className="text-primary">{taka(o.total)}</span></div>
           </div>
           <div className="flex flex-wrap gap-2 border-t pt-4">
-            <button type="button" className="btn-outline btn-sm" onClick={reorder}>Reorder items</button>
+            <button type="button" className="btn-outline btn-sm" onClick={reorder}>{t("track.reorder")}</button>
           </div>
         </div>
       )}

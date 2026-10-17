@@ -7,9 +7,11 @@ import { useCart } from "@/lib/store";
 import { useWishlist } from "@/lib/wishlist";
 import type { Category, StoreSettings } from "@/lib/types";
 import NotificationBell from "./NotificationBell";
+import { useFlags, useT } from "./TextsProvider";
 
 export default function Header({ settings, categories }: { settings: StoreSettings; categories: Category[] }) {
   const router = useRouter();
+  const t = useT(); const flags = useFlags();
   const [q, setQ] = useState("");
   const [mounted, setMounted] = useState(false);
   const count = useCart((s) => s.items.reduce((n, i) => n + i.qty, 0));
@@ -21,7 +23,7 @@ export default function Header({ settings, categories }: { settings: StoreSettin
   return (
     <header className="sticky top-0 z-30 bg-white shadow-sm">
       {settings.announcement && (
-        <div className="bg-primary-deeper px-4 py-1.5 text-center text-xs font-medium text-white/90">{settings.announcement}</div>
+        <div className="bg-secondary px-4 py-1.5 text-center text-xs font-medium text-white/90">{settings.announcement}</div>
       )}
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5 sm:gap-6">
         <Link href="/" aria-label={`${settings.storeName} home`} className="shrink-0">
@@ -37,7 +39,7 @@ export default function Header({ settings, categories }: { settings: StoreSettin
         >
           <input
             className="w-full rounded-full border border-gray-200 bg-gray-50 py-2.5 pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20"
-            placeholder="Search groceries, medicine, vegetables…"
+            placeholder={t("header.search")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Search products"
@@ -49,32 +51,32 @@ export default function Header({ settings, categories }: { settings: StoreSettin
         <div className="ml-auto flex items-center gap-1 sm:ml-0">
           {settings.showMedicine && (
             <Link href="/medicine" className="hidden items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 md:flex">
-              💊 Medicine
+              💊 {t("header.medicine")}
             </Link>
           )}
           <Link href="/orders" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 lg:block">
-            My orders
+            {t("header.orders")}
           </Link>
           <Link href="/track" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 lg:block">
-            Track order
+            {t("header.track")}
           </Link>
           <NotificationBell />
-          <Link href="/wishlist" className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100" aria-label="Wishlist">
+          {flags.showWishlist && <Link href="/wishlist" className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100" aria-label="Wishlist">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
             </svg>
             {mounted && wishCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{wishCount}</span>
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">{wishCount}</span>
             )}
-          </Link>
+          </Link>}
           <Link href="/contact" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 xl:block">
-            Contact
+            {t("header.contact")}
           </Link>
           <Link href="/cart" className="relative flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-dark">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 7H6M10 21h.01M18 21h.01" />
             </svg>
-            <span className="hidden sm:inline">Cart</span>
+            <span className="hidden sm:inline">{t("header.cart")}</span>
             {mounted && count > 0 && (
               <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold">{count}</span>
             )}
@@ -91,7 +93,7 @@ export default function Header({ settings, categories }: { settings: StoreSettin
       >
         <input
           className="w-full rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm outline-none focus:border-primary"
-          placeholder="Search products…"
+          placeholder={t("header.searchMobile")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search products"
@@ -106,7 +108,7 @@ export default function Header({ settings, categories }: { settings: StoreSettin
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-700 transition hover:border-primary/30 hover:bg-primary-soft hover:text-primary sm:text-sm"
           >
             <span className="text-base leading-none" aria-hidden>🛒</span>
-            <span className="whitespace-nowrap">All</span>
+            <span className="whitespace-nowrap">{t("header.all")}</span>
           </Link>
           {settings.showMedicine && (
             <Link
@@ -114,7 +116,7 @@ export default function Header({ settings, categories }: { settings: StoreSettin
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 sm:text-sm"
             >
               <span className="text-base leading-none" aria-hidden>💊</span>
-              <span className="whitespace-nowrap">Medicine</span>
+              <span className="whitespace-nowrap">{t("header.medicine")}</span>
             </Link>
           )}
           {groceryCats.map((c) => (
@@ -132,7 +134,7 @@ export default function Header({ settings, categories }: { settings: StoreSettin
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3.5 py-2 text-xs font-bold text-orange-800 transition hover:bg-orange-100 sm:text-sm"
           >
             <span className="text-base leading-none" aria-hidden>🔥</span>
-            <span className="whitespace-nowrap">Offers</span>
+            <span className="whitespace-nowrap">{t("header.offers")}</span>
           </Link>
         </div>
       </nav>

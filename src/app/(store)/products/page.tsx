@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import ProductCard from "@/components/store/ProductCard";
+import EmptyState from "@/components/store/EmptyState";
+import FilterLayout from "@/components/store/FilterLayout";
 import { getActiveProducts, getCategories, getSettings } from "@/server/queries";
-export const metadata: Metadata = { title: "All Products" };
+import { makeT } from "@/lib/texts";
+import { validHex } from "@/lib/theme";
+import { pageMeta } from "@/lib/seo";
 const PER = 24;
 
 type SP = { q?: string; cat?: string; sort?: string; max?: string; sale?: string; featured?: string; page?: string };
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<SP> }): Promise<Metadata> {
+  const sp = await searchParams; const [categories, st] = await Promise.all([getCategories(), getSettings()]);
+  const c = sp.cat ? categories.find((x) => x.id === sp.cat) : undefined;
+  const filtered = Boolean(sp.q || sp.sort || sp.max || sp.sale || sp.featured || sp.page);
+  const title = c ? (c.coverTitle || c.name) : sp.sale ? makeT(st.texts)("products.sale") : sp.featured ? makeT(st.texts)("products.featured") : makeT(st.texts)("products.all");
+  const desc = c?.description || `Shop ${c ? c.name : "groceries, medicines and everyday essentials"} at ${st.storeName}.`;
+  return pageMeta({ title, description: desc, path: c && !filtered ? `/products?cat=${c.id}` : "/products", image: c?.coverImage || c?.image, noindex: filtered });
+}
 
 const OVERLAY: Record<string, string> = {
   dark: "bg-black/50",
@@ -14,11 +26,13 @@ const OVERLAY: Record<string, string> = {
   light: "bg-black/20",
   none: "bg-transparent",
 };
+// compact on phones so the first row of products stays visible under the banner
 const HEIGHT: Record<string, string> = {
-  sm: "h-28 sm:h-32 md:h-36",
-  md: "h-36 sm:h-44 md:h-52",
-  lg: "h-44 sm:h-56 md:h-64",
+  sm: "h-24 sm:h-28 md:h-32",
+  md: "h-32 sm:h-40 md:h-48",
+  lg: "h-40 sm:h-52 md:h-60",
 };
+const POS: Record<string, string> = { top: "object-top", center: "object-center", bottom: "object-bottom" };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
@@ -48,23 +62,22 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     return `/products${s ? `?${s}` : ""}`;
   };
   const activeCat = cat ? categories.find((c) => c.id === cat) : null;
-  const heading = sale ? "Offers & Discounts" : featured ? "Featured Products" : activeCat ? activeCat.name : "All Products";
+  const t = makeT(settings.texts);
+  const heading = sale ? t("products.sale") : featured ? t("products.featured") : activeCat ? (activeCat.coverTitle || activeCat.name) : t("products.all");
   const chip = (active: boolean) =>
     `rounded-lg px-3 py-1.5 transition ${active ? "bg-primary text-white" : "bg-gray-50 text-gray-700 hover:bg-primary-soft"}`;
 
-  const emptyTitle = settings.emptyStateTitle || "No products found";
-  const emptyText = settings.emptyStateText || "Try a different search or filter. Fresh stock arrives daily.";
-  const hasCover = !!(activeCat?.coverImage || activeCat?.description);
   const heightCls = HEIGHT[activeCat?.coverHeight || "md"] || HEIGHT.md;
   const overlayCls = OVERLAY[activeCat?.coverOverlay || "medium"] || OVERLAY.medium;
+  const filtersOn = Boolean(q || max || sale || featured);
+  const emptyKind = all.length === 0 ? "none" : activeCat && !filtersOn ? "category" : "search";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-      <aside className="h-fit space-y-6 rounded-2xl border bg-white p-5 text-sm shadow-card lg:sticky lg:top-40">
+    <FilterLayout count={[cat, max, sort, sale, featured].filter(Boolean).length} label={t("products.filters")} title={t("products.filters")} doneLabel={t("products.showResults")} filters={<>
         <div>
-          <h3 className="mb-3 font-bold">Categories</h3>
+          <h3 className="mb-3 font-bold">{t("products.categories")}</h3>
           <div className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
-            <Link href={link({ cat: "", page: "" })} className={chip(!cat)}>All</Link>
+            <Link href={link({ cat: "", page: "" })} className={chip(!cat)}>{t("header.all")}</Link>
             {categories.map((c) => (
               <Link key={c.id} href={link({ cat: c.id, page: "" })} className={chip(cat === c.id)}>
                 {c.emoji} {c.name}
@@ -73,7 +86,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           </div>
         </div>
         <div>
-          <h3 className="mb-3 font-bold">Max price</h3>
+          <h3 className="mb-3 font-bold">{t("products.price")}</h3>
           <div className="flex flex-wrap gap-2">
             {["", "100", "300", "500", "1000"].map((m) => (
               <Link key={m} href={link({ max: m, page: "" })} className={chip(max === m)}>
@@ -83,7 +96,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           </div>
         </div>
         <div>
-          <h3 className="mb-3 font-bold">Sort by</h3>
+          <h3 className="mb-3 font-bold">{t("products.sort")}</h3>
           <div className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
             {[
               ["", "Newest"],
@@ -95,36 +108,34 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             ))}
           </div>
         </div>
-      </aside>
+      </>}>
 
       <section>
-        {activeCat && hasCover && (
-          <div className="relative mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-white shadow-sm">
-            {activeCat.coverImage ? (
-              <div className={`relative ${heightCls}`}>
-                <Image src={activeCat.coverImage} alt={activeCat.name} fill className="object-cover" sizes="(max-width:768px) 100vw, 900px" priority />
-                <div className={`absolute inset-0 ${overlayCls}`} />
-                <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-6">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-white/80">Category</p>
-                  <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl md:text-3xl">
-                    {activeCat.emoji} {activeCat.name}
-                  </h1>
-                  {activeCat.description && (
-                    <p className="mt-1 max-w-xl text-sm text-white/90 line-clamp-2 sm:line-clamp-3">{activeCat.description}</p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-5 sm:p-6">
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Category</p>
-                <h1 className="text-xl font-extrabold sm:text-2xl">{activeCat.emoji} {activeCat.name}</h1>
-                {activeCat.description && <p className="mt-1 max-w-xl text-sm text-white/85">{activeCat.description}</p>}
-              </div>
-            )}
+        {activeCat && (
+          <div className="mb-4 overflow-hidden rounded-2xl border bg-white shadow-sm">
+            <div className={`relative ${heightCls} bg-gradient-to-br from-primary to-primary-dark`} style={validHex(activeCat.coverBg) ? { background: validHex(activeCat.coverBg) } : undefined}>
+              {activeCat.coverImage ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={activeCat.coverImage} alt={activeCat.name} className={`absolute inset-0 h-full w-full object-cover ${POS[activeCat.coverPosition || "center"] ?? POS.center}`} fetchPriority="high" decoding="async" />
+                  <div className={`absolute inset-0 ${overlayCls}`} />
+                </>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-5xl opacity-90 sm:text-6xl" aria-hidden>{activeCat.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={activeCat.image} alt="" className="h-20 w-20 rounded-2xl bg-white/90 object-cover p-1 sm:h-24 sm:w-24" />
+                ) : (activeCat.emoji || "🛍️")}</div>
+              )}
+            </div>
+            <div className="px-4 py-3 sm:px-5" style={{ color: validHex(activeCat.coverTextColor) || undefined }}>
+              <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">{activeCat.coverTitle || activeCat.name}</h1>
+              {activeCat.description && <p className="mt-0.5 line-clamp-2 text-sm opacity-80 sm:line-clamp-3">{activeCat.description}</p>}
+              <p className="mt-1 text-xs opacity-60">{total} product{total === 1 ? "" : "s"}</p>
+            </div>
           </div>
         )}
 
-        {!(activeCat && hasCover && activeCat.coverImage) && (
+        {!activeCat && (
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <h1 className="text-2xl font-bold tracking-tight">
               {heading}
@@ -133,17 +144,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             <p className="text-sm text-gray-500">{total} product{total === 1 ? "" : "s"}</p>
           </div>
         )}
-        {activeCat?.coverImage && <p className="mb-3 text-sm text-gray-500">{total} product{total === 1 ? "" : "s"}</p>}
 
         {list.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-10 text-center shadow-sm sm:p-14">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-soft text-3xl">
-              {settings.emptyStateIcon || "🔍"}
-            </div>
-            <p className="text-lg font-bold text-gray-900">{emptyTitle}</p>
-            <p className="mt-1.5 text-sm text-gray-500">{emptyText}</p>
-            <Link href="/products" className="btn-primary mt-5 inline-flex">Clear filters</Link>
-          </div>
+          <EmptyState kind={emptyKind} settings={settings} />
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
             {list.map((p) => (
@@ -168,6 +171,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           </nav>
         )}
       </section>
-    </div>
+    </FilterLayout>
   );
 }

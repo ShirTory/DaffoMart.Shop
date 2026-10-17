@@ -4,14 +4,8 @@ import { hashPassword } from "./riderAuth";
 import { ApiError } from "./http";
 import { offerIsLive } from "./services";
 import { slugify } from "@/lib/format";
-import type {
-  AttendanceRecord, Banner, Category, CourierPartner, CustomPaymentMethod,
-  DeliveryZone, Employee, Offer, Product, Rider,
-} from "@/lib/types";
-import {
-  attendanceSchema, bannerSchema, categorySchema, courierSchema, employeeSchema,
-  offerSchema, paymentMethodSchema, productSchema, riderSchema, zoneSchema,
-} from "@/lib/validators";
+import type { Attendance, Banner, Category, Courier, CustomPaymentMethod, DeliveryZone, Employee, Offer, Product, Rider } from "@/lib/types";
+import { bannerSchema, categorySchema, courierSchema, employeeSchema, offerSchema, paymentMethodSchema, productSchema, riderSchema, zoneSchema } from "@/lib/validators";
 
 const now = () => new Date().toISOString();
 
@@ -97,85 +91,47 @@ export const riderCfg = {
   present: (r: Rider): Rider => { const { passHash, ...rest } = r; return { ...rest, hasPassword: Boolean(passHash) } as Rider; },
 };
 
+/** Staff list (CEO … rider). Private: contains phone numbers and salary, so the public gets an empty list. */
 export const employeeCfg = {
   col: "employees" as const, schema: employeeSchema,
-  // Admin-only: never expose staff PII to the public storefront
-  visible: (_: Employee) => false,
-  sort: (a: Employee, b: Employee) => a.name.localeCompare(b.name),
-  prepare: (d: any, prev: Employee | null): Omit<Employee, "id"> => ({
-    ...d,
-    email: d.email || undefined,
-    department: d.department || undefined,
-    joinedAt: d.joinedAt || undefined,
-    notes: d.notes || undefined,
-    riderId: d.riderId || undefined,
-    createdAt: prev?.createdAt ?? now(),
-    updatedAt: now(),
-  }),
+  visible: () => false,
+  sort: (a: Employee, b: Employee) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name),
+  prepare: (d: any, prev: Employee | null): Omit<Employee, "id"> => ({ ...d, createdAt: prev?.createdAt ?? now() }),
+  beforeDelete: async (id: string) => { for (const a of (await db.list<Attendance>("attendance")).filter((x) => x.employeeId === id)) await db.remove("attendance", a.id); },
 };
 
-export const attendanceCfg = {
-  col: "attendance" as const, schema: attendanceSchema,
-  // Admin-only: attendance is internal HR data
-  visible: (_: AttendanceRecord) => false,
-  sort: (a: AttendanceRecord, b: AttendanceRecord) => b.date.localeCompare(a.date) || a.employeeName.localeCompare(b.employeeName),
-  prepare: async (d: any, prev: AttendanceRecord | null): Promise<Omit<AttendanceRecord, "id">> => {
-    const emp = await db.get<Employee>("employees", d.employeeId);
-    if (!emp) throw new ApiError(400, "Employee not found");
-    return {
-      employeeId: d.employeeId,
-      employeeName: emp.name,
-      role: emp.role,
-      date: d.date,
-      checkIn: d.checkIn || undefined,
-      checkOut: d.checkOut || undefined,
-      status: d.status,
-      note: d.note || undefined,
-      createdAt: prev?.createdAt ?? now(),
-      updatedAt: now(),
-    };
+/** Courier companies for deliveries outside Dhaka (Pathao, Steadfast, RedX, Sundarban …). Admin only. */
+export const courierCfg = {
+  col: "couriers" as const, schema: courierSchema,
+  visible: () => false,
+  sort: (a: Courier, b: Courier) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+  prepare: (d: any, prev: Courier | null): Omit<Courier, "id"> => ({ ...d, createdAt: prev?.createdAt ?? now() }),
+  beforeDelete: async (id: string) => {
+    const used = (await db.list<{ courierId?: string; status: string }>("orders")).filter((o) => o.courierId === id && !["delivered", "cancelled", "returned"].includes(o.status)).length;
+    if (used) throw new ApiError(409, `${used} open order(s) are with this courier. Deactivate it instead of deleting.`);
   },
 };
 
-export const courierCfg = {
-  col: "couriers" as const, schema: courierSchema,
-  visible: (c: CourierPartner) => c.active,
-  sort: (a: CourierPartner, b: CourierPartner) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-  prepare: (d: any, prev: CourierPartner | null): Omit<CourierPartner, "id"> => ({
-    ...d,
-    contactPerson: d.contactPerson || undefined,
-    chargeNote: d.chargeNote || undefined,
-    trackingUrl: d.trackingUrl || undefined,
-    notes: d.notes || undefined,
-    createdAt: prev?.createdAt ?? now(),
-  }),
-};
-
+/** Extra payment options (Rocket, Upay, bank transfer …). Only active ones are public. */
 export const paymentMethodCfg = {
   col: "payment_methods" as const, schema: paymentMethodSchema,
   visible: (m: CustomPaymentMethod) => m.active,
   sort: (a: CustomPaymentMethod, b: CustomPaymentMethod) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
   prepare: (d: any, prev: CustomPaymentMethod | null): Omit<CustomPaymentMethod, "id"> => ({
-    label: d.label,
-    hint: d.hint || "",
-    number: d.number || undefined,
-    icon: d.icon || undefined,
-    active: d.active !== false,
-    sortOrder: d.sortOrder ?? 0,
-    requireTrx: d.requireTrx !== false,
+    label: d.label, hint: d.hint || "", number: d.number || undefined, icon: d.icon || undefined,
+    active: d.active !== false, sortOrder: d.sortOrder ?? 0, requireTrx: d.requireTrx !== false,
     createdAt: prev?.createdAt ?? now(),
   }),
 };
 
 export const resource = {
+  payment_methods: { c: collectionRoutes<CustomPaymentMethod>(paymentMethodCfg), i: itemRoutes<CustomPaymentMethod>(paymentMethodCfg) },
+  employees: { c: collectionRoutes<Employee>(employeeCfg), i: itemRoutes<Employee>(employeeCfg) },
+  couriers: { c: collectionRoutes<Courier>(courierCfg), i: itemRoutes<Courier>(courierCfg) },
   zones: { c: collectionRoutes<DeliveryZone>(zoneCfg), i: itemRoutes<DeliveryZone>(zoneCfg) },
   riders: { c: collectionRoutes<Rider>(riderCfg), i: itemRoutes<Rider>(riderCfg) },
   products: { c: collectionRoutes<Product>(productCfg), i: itemRoutes<Product>(productCfg) },
   categories: { c: collectionRoutes<Category>(categoryCfg), i: itemRoutes<Category>(categoryCfg) },
   banners: { c: collectionRoutes<Banner>(bannerCfg), i: itemRoutes<Banner>(bannerCfg) },
   offers: { c: collectionRoutes<Offer>(offerCfg), i: itemRoutes<Offer>(offerCfg) },
-  employees: { c: collectionRoutes<Employee>(employeeCfg), i: itemRoutes<Employee>(employeeCfg) },
-  attendance: { c: collectionRoutes<AttendanceRecord>(attendanceCfg), i: itemRoutes<AttendanceRecord>(attendanceCfg) },
-  couriers: { c: collectionRoutes<CourierPartner>(courierCfg), i: itemRoutes<CourierPartner>(courierCfg) },
-  payment_methods: { c: collectionRoutes<CustomPaymentMethod>(paymentMethodCfg), i: itemRoutes<CustomPaymentMethod>(paymentMethodCfg) },
 };

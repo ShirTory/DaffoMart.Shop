@@ -3,6 +3,9 @@ export interface Category {
   id: string; name: string; slug: string; emoji: string; image?: string;
   coverImage?: string; description?: string;
   coverOverlay?: string; coverHeight?: string;
+  coverTextColor?: string; coverBg?: string; coverPosition?: string; coverTitle?: string;
+  /** circle icon on the home page: hide / own background colour */
+  hideOnHome?: boolean; iconBg?: string;
   kind?: CategoryKind; active: boolean; sortOrder: number;
 }
 
@@ -48,9 +51,35 @@ export interface StoreSettings {
   /** Meta (Facebook) Pixel ID — only loaded when non-empty */
   metaPixelId?: string;
   footerPromoImage?: string; footerPromoLink?: string;
+  footerPromoShow?: boolean; footerPromoHeight?: string; footerPromoBg?: string; footerPromoAlt?: string; footerPromoFit?: string;
+  footerShowPayments?: boolean; footerShowCategories?: boolean;
+  /** editable website wording: key -> text (see lib/texts.ts) */
+  texts?: Record<string, string>;
+  /** buttons */
+  buttonColor?: string; buttonTextColor?: string; buttonStyle?: string;
+  showBuyNow?: boolean; showWishlist?: boolean; showCardWhatsapp?: boolean; showCardDelivery?: boolean;
+  /** floating support buttons */
+  supportCallColor?: string; supportWaColor?: string; supportPosition?: string; supportWaMessage?: string;
+  /** category icon section on the home page */
+  showCatSection?: boolean; catIconSize?: string; catIconShape?: string; catIconBg?: string; catIconFit?: string; catShowLabels?: boolean; catGap?: string; catLabelColor?: string;
+  /** empty states */
+  emptyStateImage?: string; emptyStateBg?: string; emptyStateColor?: string; emptyStateAlign?: string;
+  /** payment methods: how each one is displayed */
+  payDisplay?: Record<string, PayDisplay>;
+  /** SEO / sharing */
+  seoTitle?: string; seoDescription?: string; ogImage?: string; favicon?: string;
+  /** invoice look & content */
+  invoice?: InvoiceSettings;
+}
+export interface PayDisplay { label?: string; hint?: string; logo?: string; color?: string; order?: number; visible?: boolean }
+export interface InvoiceSettings {
+  title?: string; prefix?: string; companyName?: string; logo?: string; showLogo?: boolean;
+  address?: string; phone?: string; email?: string; website?: string; taxId?: string; taxLabel?: string;
+  accent?: string; paper?: string; layout?: string; showItemImage?: boolean; showUnit?: boolean; showPaymentInfo?: boolean; showCourier?: boolean; showCustomerPhone?: boolean; showPaidStamp?: boolean;
+  notes?: string; terms?: string; footer?: string; signatureLabel?: string; showSignature?: boolean;
 }
 
-export interface DeliveryZone { id: string; name: string; charge: number; freeOver: number; eta: string; active: boolean; sortOrder: number }
+export interface DeliveryZone { id: string; name: string; charge: number; freeOver: number; eta: string; active: boolean; sortOrder: number; /** delivered by a courier company (outside Dhaka) instead of a rider */ viaCourier?: boolean }
 export type RiderStatus = "pending" | "approved" | "rejected";
 /** Riders created before the application flow have no `status` and count as approved. */
 export interface RiderApplication {
@@ -72,66 +101,28 @@ export const ORDER_STATUSES: OrderStatus[] = ["pending", "confirmed", "processin
 export type PaymentMethod = string;
 export type PaymentStatus = "unpaid" | "pending" | "paid" | "failed" | "refunded";
 export const PAYMENT_LABEL: Record<string, string> = { cod: "Cash on delivery", bkash: "bKash", nagad: "Nagad", online: "Online payment" };
-export interface PaymentOption {
-  id: PaymentMethod;
-  label: string;
-  hint: string;
-  number?: string;
-  /** shown but cannot be chosen yet (e.g. gateway not connected) */
-  disabled?: boolean;
-  /** optional icon / emoji for display */
-  icon?: string;
-}
+export interface PaymentOption { id: PaymentMethod; label: string; hint: string; number?: string; logo?: string; color?: string; icon?: string; /** custom methods: customer must enter TrxID + payer number */ requireTrx?: boolean; /** shown but cannot be chosen yet (e.g. gateway not connected) */ disabled?: boolean }
 /** Admin-managed extra payment methods (Rocket, Upay, bank transfer, etc.). */
-export interface CustomPaymentMethod {
-  id: string;
-  label: string;
-  hint: string;
-  number?: string;
-  icon?: string;
-  active: boolean;
-  sortOrder: number;
-  requireTrx: boolean;
-  createdAt: string;
-}
+export interface CustomPaymentMethod { id: string; label: string; hint: string; number?: string; icon?: string; active: boolean; sortOrder: number; requireTrx: boolean; createdAt: string }
 
 export interface OrderItem { id: string; name: string; unit: string; price: number; qty: number; image?: string; emoji?: string }
 export interface Order {
-  id: string; orderNo: string; invoiceNo?: string; name: string; phone: string; address: string; zone: string; zoneName?: string;
+  id: string; orderNo: string; name: string; phone: string; address: string; zone: string; zoneName?: string;
   riderId?: string; riderName?: string; riderPhone?: string; hasRx?: boolean;
-  payment: PaymentMethod; paymentStatus?: PaymentStatus; paymentRef?: string; paymentFrom?: string; lat?: number; lng?: number; note: string;
+  payment: PaymentMethod; /** display name of a custom payment method */ paymentLabel?: string; paymentStatus?: PaymentStatus; paymentRef?: string; paymentFrom?: string; lat?: number; lng?: number; note: string;
   items: OrderItem[]; subtotal: number; delivery: number; serviceCharge?: number; discount: number; couponCode?: string; total: number;
   status: OrderStatus; stockRestored?: boolean; createdAt: string; updatedAt: string;
+  /** courier shipment (outside Dhaka) */
+  courierId?: string; courierName?: string; trackingNo?: string; courierUrl?: string; courierAt?: string;
 }
+
+export interface Courier { id: string; name: string; phone: string; /** tracking link template, {tracking} is replaced by the tracking number */ trackingUrl: string; note: string; charge: number; active: boolean; sortOrder: number; createdAt: string }
+
+export const EMPLOYEE_ROLES = ["CEO / Owner", "Manager", "Accountant", "Operations", "Customer Support", "Warehouse / Packer", "Marketing", "Rider", "Other"] as const;
+export interface Employee { id: string; name: string; role: string; phone: string; email: string; department?: string; joinedAt?: string; salary?: number; note: string; active: boolean; riderId?: string; createdAt: string }
+export type AttendanceStatus = "present" | "late" | "half" | "leave" | "absent" | "off";
+export const ATTENDANCE_STATUSES: AttendanceStatus[] = ["present", "late", "half", "leave", "absent", "off"];
+export const ATTENDANCE_LABEL: Record<AttendanceStatus, string> = { present: "Present", late: "Late", half: "Half day", leave: "On leave", absent: "Absent", off: "Day off" };
+export interface Attendance { id: string; employeeId: string; date: string; status: AttendanceStatus; checkIn?: string; checkOut?: string; note?: string; updatedAt: string }
 
 export interface CartItem { id: string; slug: string; name: string; price: number; unit: string; emoji: string; image?: string; qty: number; stock?: number; rx?: boolean }
-
-/** Staff roles from leadership to field */
-export type EmployeeRole = "ceo" | "manager" | "supervisor" | "staff" | "rider" | "warehouse" | "support";
-export const EMPLOYEE_ROLES: EmployeeRole[] = ["ceo", "manager", "supervisor", "staff", "warehouse", "support", "rider"];
-export const ROLE_LABEL: Record<EmployeeRole, string> = {
-  ceo: "CEO", manager: "Manager", supervisor: "Supervisor", staff: "Staff",
-  warehouse: "Warehouse", support: "Support", rider: "Rider",
-};
-
-export interface Employee {
-  id: string; name: string; phone: string; email?: string;
-  role: EmployeeRole; department?: string; active: boolean;
-  joinedAt?: string; notes?: string; riderId?: string;
-  createdAt: string; updatedAt: string;
-}
-
-export interface AttendanceRecord {
-  id: string; employeeId: string; employeeName: string; role: EmployeeRole;
-  date: string; /** YYYY-MM-DD */
-  checkIn?: string; checkOut?: string;
-  status: "present" | "absent" | "late" | "half" | "leave";
-  note?: string; createdAt: string; updatedAt: string;
-}
-
-export interface CourierPartner {
-  id: string; name: string; phone: string; contactPerson?: string;
-  areas: string; /** free text e.g. Outside Dhaka / Chattogram */
-  chargeNote?: string; trackingUrl?: string; active: boolean;
-  sortOrder: number; notes?: string; createdAt: string;
-}

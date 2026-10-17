@@ -24,3 +24,35 @@ Checked: `npm ci`, `tsc --noEmit` (0 errors), `next build` (passes), plus a live
 - `/api/health` is public and shows which env vars are set (booleans only). Fine for debugging; remove or protect later.
 - Set `PAYMENT_TEST_MODE` to `false`/unset on the live site – the sandbox gateway lets anyone "pay" for free.
 - Google `Marker` is deprecated (still works); migrate to `AdvancedMarkerElement` later.
+
+---
+
+# Round 2 – requirements audit & new modules
+
+## Why so many things were "missing" in the admin panel (root causes)
+1. **Theme settings were dummy controls.** Admin saved `primaryColor`, `buttonRadius`, `buttonSize`… and the layout wrote CSS variables, but Tailwind used fixed hex colours and nothing read the variables. Now Tailwind colours and `.btn*` classes read the variables (`src/lib/theme.ts`, `globals.css`, `tailwind.config.ts`).
+2. **Old seed defaults were rose/amber** (not the logo's blue/orange). They are now ignored automatically (`getSettings`), so turning the theme on does not recolour your live site.
+3. **Footer promo image existed in the database schema only** – no admin field, nothing rendered. Now in Admin → Appearance and the footer.
+4. **Hard-coded wording and colours** (red buttons/prices, "Delivery 1–2 hours", headings…) – now driven by Admin → Website Text and the theme.
+5. **Category cover controls were incomplete**; the description was drawn on top of the image. Now title + description sit right under a height-controlled image, with fallback, position, colours, own title.
+6. **Payment display** (logo / label / order / visibility) did not exist. The footer showed "Online" even when no gateway was connected.
+7. **Invoice** was a hard-coded popup. Now a real, customisable invoice for every order (customer + admin).
+8. **No `seo.ts`** although the layout referred to it → no canonical/OG per page. Added. Product pages now have real JSON-LD (no invented rating/price/availability).
+9. **`/policy` page was outside the store layout** (no header/footer/theme). Moved into `(store)`.
+10. Favicon was one 512 px image (blurry at 16 px). Generated 16/32/48/180/192/512 + `favicon.ico` + web manifest.
+
+## New in the admin (left menu)
+Operations · Staff · Attendance · Courier Services · Appearance · Website Text · Invoice (+ Delivery Areas "delivered by courier", order → courier + tracking, payment display).
+
+## Things to know
+- Netlify has no persistent disk: set the Firebase variables (see DEPLOYMENT.md) or settings, orders and uploads will not survive a deploy.
+- Staff, attendance and couriers are admin-only collections (the public API returns an empty list).
+- Customers open their invoice with order number + the phone used at checkout (`/invoice?no=…&phone=…`), same rule as order tracking.
+
+---
+
+# Round 3 – mobile products page
+
+- **Filters moved out of the way on phones.** Categories / Max price / Sort by now open from a "Filters" button in a drawer that slides in from the LEFT, so the first screen shows products. On desktop they stay in the left column. (`components/store/FilterLayout.tsx`; button/apply wording is editable in Admin → Website Text.)
+- **Unlimited categories.** The footer listed only 5; it now lists every category. The filter drawer, header chips and home page already showed all.
+- **Per-category cover image is easier to find.** Admin → Categories: every category card has its own cover strip ("＋ Add cover image for this category" / "Change cover"). The cover is shown on that category's page, with its title and description right under it.

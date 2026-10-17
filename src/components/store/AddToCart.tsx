@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/store";
 import type { Product } from "@/lib/types";
+import { useFlags, useT } from "./TextsProvider";
 
 export default function AddToCart({
   product,
@@ -16,7 +17,7 @@ export default function AddToCart({
   /** full international digits e.g. 8801XXXXXXXXX — if set, shows WhatsApp button */
   whatsapp?: string;
 }) {
-  const add = useCart((s) => s.add);
+  const add = useCart((s) => s.add); const t = useT(); const flags = useFlags();
   const router = useRouter();
   const [qty, setQty] = useState(1);
   const [done, setDone] = useState(false);
@@ -40,7 +41,7 @@ export default function AddToCart({
 
   const wa = (whatsapp || "").replace(/\D/g, "");
   const waHref = wa
-    ? `https://wa.me/${wa}?text=${encodeURIComponent(`Hi DaffoMart, I want to order: ${product.name} (${product.unit}) × ${qty}`)}`
+    ? `https://wa.me/${wa}?text=${encodeURIComponent(`Hi, I want to order: ${product.name} (${product.unit}) × ${qty}`)}`
     : "";
 
   return (
@@ -56,14 +57,14 @@ export default function AddToCart({
       )}
       <div className="flex flex-wrap gap-2">
         <button type="button" className={`${done ? "btn bg-emerald-600 text-white" : "btn-accent"} min-w-0 flex-1 text-sm`} disabled={out} onClick={onAdd}>
-          {out ? "Out of stock" : done ? "Added ✓" : "Add to cart"}
+          {out ? t("card.out") : done ? t("card.added") : t("card.add").replace(/^\+\s*/, "")}
         </button>
-        {showBuyNow && !out && (
-          <button type="button" className="btn-primary min-w-0 flex-1 text-sm" onClick={onBuyNow}>Buy now</button>
+        {showBuyNow && flags.showBuyNow && !out && (
+          <button type="button" className="btn-primary min-w-0 flex-1 text-sm" onClick={onBuyNow}>{t("card.buyNow")}</button>
         )}
-        {waHref && (
+        {waHref && flags.showCardWhatsapp && (
           <a href={waHref} target="_blank" rel="noopener noreferrer" className="btn bg-[#25D366] text-white hover:bg-[#1da851] min-w-0 flex-1 text-sm text-center">
-            WhatsApp
+            {t("card.whatsapp")}
           </a>
         )}
       </div>

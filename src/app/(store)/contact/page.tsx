@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getSettings, getZones } from "@/server/queries";
 import { taka } from "@/lib/format";
 import { mapsEmbed } from "@/lib/maps";
-export const metadata: Metadata = { title: "Contact & Delivery" };
+export const metadata: Metadata = { title: "Contact & Delivery", alternates: { canonical: "/contact" } };
 export const revalidate = 60; // served from cache, refreshed when the admin saves (and at most every 60 s)
 
 export default async function ContactPage() {
